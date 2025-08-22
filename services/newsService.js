@@ -114,8 +114,8 @@ async function getNews(section = 'world', limit = 30) {
         { url: 'https://feeds.reuters.com/reuters/topNews' }
       ],
       kr: [
-        { url: 'https://rss.joins.com/joins_news_list.xml' },
-        { url: 'http://rss.khan.co.kr/kh_news.xml' }
+        { url: 'https://www.yna.co.kr/rss/news.xml' },
+        { url: 'https://rss.donga.com/total.xml' }
       ],
       japan: [
         { url: 'https://www3.nhk.or.jp/rss/news/cat0.xml' }
