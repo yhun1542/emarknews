@@ -14,14 +14,21 @@ const AIService = require('./services/aiService');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// 1) 프록시 신뢰 (Railway/Nginx 등 1-hop 프록시 환경)
+//   - 반드시 rate-limit, logger 등 어떤 미들웨어보다 먼저 실행
+app.set('trust proxy', process.env.TRUST_PROXY ?? 1);
+
 // Initialize services
 const newsService = new NewsService();
 const aiService = new AIService();
 
-// Rate limiting
+// 2) rate-limit: 표준 헤더만 사용하고, proxy 신뢰 기반 IP 추출
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: process.env.MAX_REQUESTS_PER_MINUTE || 100,
+  windowMs: Number(process.env.RATE_WINDOW_MS ?? 60_000),
+  limit: Number(process.env.RATE_LIMIT ?? 120),
+  standardHeaders: true,    // RFC 표준 헤더
+  legacyHeaders: false,     // 레거시 헤더 비활성
+  keyGenerator: (req) => req.ip, // trust proxy 설정 시 client IP 정확히 인식
   message: 'Too many requests, please try again later.'
 });
 
@@ -273,6 +280,22 @@ app.get('/', (req, res) => {
 
 app.get('/detail.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'detail.html'));
+});
+
+// 3) 헬스체크 (간단 버전)
+app.get('/health', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
+// 4) RSS 헬스 (선택: rss 상태 객체가 있으면 노출)
+// try/catch로 존재하지 않아도 안전하게
+app.get('/health/rss', (req, res) => {
+  try {
+    const rss = require('./services/rss/state'); // { lastSuccessAt, sources: {...} } 형태 가정
+    res.json({ ok: true, ...rss });
+  } catch {
+    res.json({ ok: true, info: 'rss state not wired' });
+  }
 });
 
 // 404 handler
