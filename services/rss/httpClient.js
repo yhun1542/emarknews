@@ -1,3 +1,4 @@
+// services/rss/httpClient.js
 const http = require('http');
 const https = require('https');
 const axios = require('axios');
@@ -13,9 +14,8 @@ const client = axios.create({
   headers: {
     'user-agent': process.env.RSS_USER_AGENT ?? 'emarknews-bot/1.0 (+https://emarknews.com)'
   },
-  // 문자열 그대로 받도록
   responseType: 'text',
-  validateStatus: (s) => s >= 200 && s < 400
+  validateStatus: (s) => s >= 200 && s < 400,
 });
 
 async function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
@@ -27,15 +27,8 @@ async function fetchWithRetry(url, tries = 3) {
       return await client.get(url);
     } catch (e) {
       lastErr = e;
-      const code = e?.code;
-      // 재시도 가치 없는 코드면 즉시 종료
-      if (['ENOTFOUND','EAI_AGAIN','ECONNRESET','ETIMEDOUT'].includes(code) || e?.response?.status >= 500) {
-        // 재시도 (백오프)
-        const backoff = Math.min(2000 * (2 ** i), 10000);
-        await sleep(backoff);
-        continue;
-      }
-      throw e;
+      const backoff = Math.min(2000 * (2 ** i), 10000);
+      await sleep(backoff);
     }
   }
   throw lastErr;
@@ -43,9 +36,7 @@ async function fetchWithRetry(url, tries = 3) {
 
 function logAxiosError(err, ctx = {}) {
   const { code, errno, syscall, hostname, message } = err || {};
-  // 콘솔/로거 통일
   console.error('[rss-error]', { code, errno, syscall, hostname, message, ...ctx });
 }
 
 module.exports = { client, fetchWithRetry, logAxiosError };
-
