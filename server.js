@@ -204,7 +204,8 @@ app.post('/api/translate', async (req, res) => {
       });
     }
     
-    const translated = await aiService.translateText(text, targetLang);
+    const result = await aiService.translate(text, targetLang);
+    const translated = result.success ? result.data.translated : 'Translation failed';
     
     res.json({
       success: true,
@@ -235,7 +236,8 @@ app.post('/api/summarize', async (req, res) => {
       });
     }
     
-    const summary = await aiService.generateSummary(text, maxPoints, detailed);
+    const result = await aiService.summarize(text, { detailed });
+    const summary = result.success ? result.data.summary : 'Failed to generate summary';
     
     res.json({
       success: true,
