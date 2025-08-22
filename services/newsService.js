@@ -446,6 +446,27 @@ class NewsService {
   getStatus() {
     return { initialized: true, sections: Object.keys(DEFAULT_WEIGHTS), cache: redis ? 'redis' : 'memory' };
   }
+
+  getCacheStatus() {
+    return {
+      type: redis ? 'redis' : 'memory',
+      connected: redis ? redis.isOpen : false
+    };
+  }
+
+  async clearCache() {
+    if (redis) {
+      try {
+        await redis.flushAll();
+        this.logger.info('Redis cache cleared.');
+      } catch (e) {
+        this.logger.warn('Redis clear failed:', e.message);
+      }
+    } else {
+      memoryCache.clear();
+      this.logger.info('Memory cache cleared.');
+    }
+  }
 }
 
 module.exports = NewsService;
