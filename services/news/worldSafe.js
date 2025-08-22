@@ -155,16 +155,54 @@ async function getWorldNewsSWR() {
 async function worldHandler(req, res) {
   try {
     const { data } = await getWorldNewsSWR();
-    // 다운 방지: 어떤 경우에도 200 반환 (콘텐츠 없으면 [])
-    res.json(data);
+    
+    // 데이터가 없으면 NewsAPI로 즉시 페일백
+    if (!data || data.length === 0) {
+      try {
+        const fb = await newsService.fetchFromNewsAPI('newsapi', 'world');
+        return res.status(200).json({
+          success: true,
+          data: {
+            articles: fb.slice(0, WORLD_PAGE_SIZE)
+          }
+        });
+      } catch (e) {
+        console.error('[newsapi-fallback-error]', e);
+        // NewsAPI도 실패하면 빈 배열 반환 (프론트 에러 UI 방지)
+        return res.status(200).json({
+          success: true,
+          data: {
+            articles: []
+          }
+        });
+      }
+    }
+    
+    // RSS 데이터가 있으면 반환
+    return res.status(200).json({
+      success: true,
+      data: {
+        articles: data
+      }
+    });
   } catch (e) {
     console.error('[worldHandler-error]', e);
-    // 최후: NewsAPI 한 번 더 시도 후, 실패해도 200 []
+    // 최후 방어선: NewsAPI 시도 후 실패해도 200 반환
     try {
-      const fb = await newsService.fetchFromNewsAPI('world');
-      return res.json(fb);
+      const fb = await newsService.fetchFromNewsAPI('newsapi', 'world');
+      return res.status(200).json({
+        success: true,
+        data: {
+          articles: fb.slice(0, WORLD_PAGE_SIZE)
+        }
+      });
     } catch {
-      return res.json([]);
+      return res.status(200).json({
+        success: true,
+        data: {
+          articles: []
+        }
+      });
     }
   }
 }
