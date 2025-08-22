@@ -462,10 +462,17 @@
             try {
                 const response = await fetch(`/api/news/${section}?limit=30`);
                 const data = await response.json();
+                
+                console.log('API Response:', data);
+                console.log('data.success:', data.success);
+                console.log('data.data:', data.data);
+                console.log('data.data.articles:', data.data ? data.data.articles : 'undefined');
 
                 if (data.success && data.data && data.data.articles && data.data.articles.length > 0) {
+                    console.log('Displaying news with', data.data.articles.length, 'articles');
                     displayNews(data.data.articles);
                 } else {
+                    console.log('Showing error - conditions not met');
                     showError();
                 }
             } catch (error) {
