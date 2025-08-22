@@ -56,6 +56,17 @@ app.use(morgan('combined', { stream: { write: message => logger.info(message.tri
 // Basic middleware
 app.use(cors());
 app.use(express.json());
+
+// (2) /api 에서는 304가 나오지 않도록 강제 no-store + 변동 ETag
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  // Express는 ETag가 이미 있으면 새로 계산하지 않음 → 304 방지
+  res.set('ETag', `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  next();
+});
+
 app.use('/api/', limiter);
 
 // Static files with proper caching
