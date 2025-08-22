@@ -306,3 +306,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+
+
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`EmarkNews server running on port ${PORT}`, { service: 'emarknews' });
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`, { service: 'emarknews' });
+  logger.info(`Health check: http://localhost:${PORT}/health`, { service: 'emarknews' });
+});
+
