@@ -481,9 +481,17 @@
                     
                     const data = await response.json();
                     
-                    if (data.success && data.data && data.data.articles) {
-                        this.articles = data.data.articles;
-                        this.displayNews(this.articles);
+                    if (data.success && data.data) {
+                        // 새로운 NewsService 구조: data.data가 직접 배열
+                        // 기존 구조: data.data.articles가 배열
+                        const articles = Array.isArray(data.data) ? data.data : data.data.articles;
+                        
+                        if (articles && articles.length > 0) {
+                            this.articles = articles;
+                            this.displayNews(this.articles);
+                        } else {
+                            this.showError('뉴스가 없습니다.');
+                        }
                     } else {
                         throw new Error('Invalid response format');
                     }
