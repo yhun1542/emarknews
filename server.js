@@ -1,0 +1,308 @@
+// server.js - EmarkNews Main Server
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const morgan = require('morgan');
+const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const logger = require('./utils/logger');
+const NewsService = require('./services/newsService');
+const AIService = require('./services/aiService');
+
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+// Initialize services
+const newsService = new NewsService();
+const aiService = new AIService();
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: process.env.MAX_REQUESTS_PER_MINUTE || 100,
+  message: 'Too many requests, please try again later.'
+});
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
+
+// Performance middleware
+app.use(compression());
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) }}));
+
+// Basic middleware
+app.use(cors());
+app.use(express.json());
+app.use('/api/', limiter);
+
+// Static files with proper caching
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1y',
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+    // Add versioning for CSS/JS files
+    if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    services: {
+      server: 'running',
+      redis: newsService.getCacheStatus(),
+      ai: aiService.getStatus()
+    }
+  });
+});
+
+// Main news API endpoint
+app.get('/api/news/:section', async (req, res) => {
+  try {
+    const { section } = req.params;
+    const { page = 1, limit = 30, useCache = 'true' } = req.query;
+    
+    const validSections = ['world', 'kr', 'japan', 'buzz', 'tech', 'business'];
+    if (!validSections.includes(section)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid section. Must be one of: ${validSections.join(', ')}`
+      });
+    }
+
+    const result = await newsService.getNews(
+      section,
+      useCache === 'true',
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    res.json(result);
+  } catch (error) {
+    logger.error(`API Error - /api/news/${req.params.section}:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch news',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get specific article
+app.get('/api/article/:section/:id', async (req, res) => {
+  try {
+    const { section, id } = req.params;
+    const article = await newsService.getArticleById(section, id);
+    
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        error: 'Article not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: article
+    });
+  } catch (error) {
+    logger.error(`API Error - /api/article/${req.params.section}/${req.params.id}:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch article'
+    });
+  }
+});
+
+// Search endpoint
+app.get('/api/search', async (req, res) => {
+  try {
+    const { q, section, limit = 20 } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query is required'
+      });
+    }
+    
+    const results = await newsService.searchNews(
+      q.trim(),
+      section,
+      parseInt(limit)
+    );
+    
+    res.json({
+      success: true,
+      query: q,
+      count: results.length,
+      data: results
+    });
+  } catch (error) {
+    logger.error('API Error - /api/search:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Search failed'
+    });
+  }
+});
+
+// AI Translation endpoint
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, targetLang = 'ko' } = req.body;
+    
+    if (!text || text.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
+    }
+    
+    const translated = await aiService.translateText(text, targetLang);
+    
+    res.json({
+      success: true,
+      data: {
+        original: text,
+        translated: translated,
+        targetLanguage: targetLang
+      }
+    });
+  } catch (error) {
+    logger.error('API Error - /api/translate:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Translation failed'
+    });
+  }
+});
+
+// AI Summary endpoint
+app.post('/api/summarize', async (req, res) => {
+  try {
+    const { text, maxPoints = 5, detailed = false } = req.body;
+    
+    if (!text || text.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
+    }
+    
+    const summary = await aiService.generateSummary(text, maxPoints, detailed);
+    
+    res.json({
+      success: true,
+      data: {
+        summary: summary,
+        points: Array.isArray(summary) ? summary.length : 1,
+        detailed: detailed
+      }
+    });
+  } catch (error) {
+    logger.error('API Error - /api/summarize:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Summarization failed'
+    });
+  }
+});
+
+// Service statistics
+app.get('/api/stats', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        used: Math.floor(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.floor(process.memoryUsage().heapTotal / 1024 / 1024)
+      },
+      timestamp: new Date().toISOString(),
+      services: {
+        news: newsService.getStatus(),
+        ai: aiService.getStatus(),
+        cache: newsService.getCacheStatus()
+      }
+    }
+  });
+});
+
+// Clear cache endpoint (admin only - add auth in production)
+app.post('/api/cache/clear', async (req, res) => {
+  try {
+    await newsService.clearCache();
+    res.json({
+      success: true,
+      message: 'Cache cleared successfully'
+    });
+  } catch (error) {
+    logger.error('API Error - /api/cache/clear:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear cache'
+    });
+  }
+});
+
+// Serve HTML files
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/detail.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'detail.html'));
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    path: req.path
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await newsService.disconnect();
+  await aiService.disconnect();
+  process.exit(0);
+});
+
+// Start server
+app.listen(PORT, () => {
+  logger.info(`EmarkNews server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Health check: http://localhost:${PORT}/health`);
+});

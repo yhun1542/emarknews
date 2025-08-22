@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>상세보기 - EmarkNews</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <style>
+        :root {
+            --primary-color: #5a4fcf;
+            --primary-dark: #4338ca;
+            --background-color: #f8f9fa;
+            --surface-color: #ffffff;
+            --text-color: #1e293b;
+            --text-secondary: #64748b;
+            --text-content: #334155;
+            --border-color: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: var(--surface-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .header-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            color: var(--text-color);
+        }
+
+        .logo-svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .logo-text {
+            font-size: 22px;
+            font-weight: 800;
+        }
+        
+        .logo-com {
+            color: var(--primary-color);
+            font-size: 16px;
+            font-weight: 700;
+            position: relative;
+            top: 1px;
+        }
+
+        .content-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 4rem;
+            font-size: 1.2rem;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .article-content {
+            display: none;
+        }
+        
+        .article-content.visible {
+            display: block;
+        }
+
+        .article-header {
+            background: var(--surface-color);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        .article-title {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.3;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .source {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-right: 0.5rem;
+        }
+
+        .rating-badge {
+            background: var(--primary-dark);
+            color: white;
+            padding: 0.3rem 0.7rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        
+        .rating-star {
+            color: #FFD700;
+        }
+
+        .tabs-container {
+            background: var(--surface-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            background: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: -2px;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .tab-content {
+            max-height: 75vh;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+
+        .tab-content::-webkit-scrollbar { display: none; }
+        .tab-content { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .summary-point {
+            font-size: 1rem;
+            line-height: 1.8;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: flex-start;
+            color: var(--text-content);
+        }
+        
+        .summary-bullet {
+            color: var(--primary-color);
+            margin-right: 0.8rem;
+            flex-shrink: 0;
+            padding-top: 4px;
+        }
+
+        .translation-text {
+            font-size: 1rem;
+            line-height: 1.9;
+            color: var(--text-content);
+            white-space: pre-wrap;
+            background-color: #f8f9ff;
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .action-footer {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .action-button {
+            display: block;
+            width: 100%;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .close-button {
+            background-color: var(--border-color);
+            color: var(--text-color);
+        }
+        
+        .close-button:hover {
+            background-color: #cbd5e1;
+        }
+
+        .link-button {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .link-button:hover {
+            background: var(--primary-dark);
+        }
+
+        @media (max-width: 768px) {
+            .header-container {
+                padding: 0 1rem;
+            }
+            
+            .logo-svg {
+                width: 28px;
+                height: 28px;
+            }
+            
+            .logo-text {
+                font-size: 20px;
+            }
+            
+            .logo-com {
+                font-size: 14px;
+            }
+            
+            .article-title {
+                font-size: 1.6rem;
+            }
+            
+            .content-container {
+                margin: 1rem auto;
+            }
+            
+            .tabs-container, .article-header {
+                padding: 1.5rem;
+                border-radius: 0;
+            }
+            
+            .tab-button {
+                font-size: 1rem;
+                padding: 0.8rem 1rem;
+            }
+            
+            .action-footer {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-container">
+            <a href="/" class="logo">
+                <img src="/logo.svg" alt="EmarkNews Logo" class="logo-svg" />
+                <span class="logo-text">EmarkNews</span><span class="logo-com">.com</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="content-container">
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>기사 내용을 불러오는 중입니다...</p>
+        </div>
+        
+        <div class="article-content" id="article-content">
+            <header class="article-header">
+                <h1 id="article-title" class="article-title"></h1>
+                <div class="article-meta">
+                    <div id="source-time" class="source-time"></div>
+                    <div id="rating-badge" class="rating-badge"></div>
+                </div>
+            </header>
+
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button id="btn-summary" class="tab-button active" onclick="showTab('summary')">✨ AI 상세 요약</button>
+                    <button id="btn-translation" class="tab-button" onclick="showTab('translation')">🌍 원문 번역</button>
+                </div>
+
+                <div id="tab-summary" class="tab-content">
+                    <div id="summary-content" class="summary-content"></div>
+                    <div class="action-footer">
+                        <a id="link-summary" href="#" target="_blank" class="action-button link-button">🔗 원문 보기</a>
+                        <button class="action-button close-button" onclick="window.history.back()">← 뒤로가기</button>
+                    </div>
+                </div>
+
+                <div id="tab-translation" class="tab-content" style="display: none;">
+                    <div id="translation-text" class="translation-text"></div>
+                    <div class="action-footer">
+                        <a id="link-translation" href="#" target="_blank" class="action-button link-button">🔗 원문 보기</a>
+                        <button class="action-button close-button" onclick="window.history.back()">← 뒤로가기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+            document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabName).style.display = 'block';
+            document.getElementById('btn-' + tabName).classList.add('active');
+        }
+
+        // Time calculation
+        function getTimeAgo(publishedAt) {
+            const now = new Date();
+            const published = new Date(publishedAt);
+            if (isNaN(published.getTime())) return "";
+            
+            const diffMinutes = Math.floor((now - published) / 60000);
+            if (diffMinutes < 60) return `${diffMinutes}분 전`;
+            return `${Math.floor(diffMinutes / 60)}시간 전`;
+        }
+
+        // Page initialization
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const articleId = urlParams.get('id');
+            const section = urlParams.get('section');
+
+            if (!articleId || !section) {
+                document.getElementById('loading').innerHTML = 
+                    '<p style="color: #dc2626;">오류: 기사 정보를 찾을 수 없습니다.</p>';
+                return;
+            }
+
+            // Try to get from sessionStorage first
+            const storageKey = `article_${section}_${articleId}`;
+            let article = null;
+            
+            const storedData = sessionStorage.getItem(storageKey);
+            if (storedData) {
+                try {
+                    article = JSON.parse(storedData);
+                } catch (e) {
+                    console.error('Failed to parse stored article:', e);
+                }
+            }
+
+            // If not in sessionStorage, fetch from API
+            if (!article) {
+                try {
+                    const response = await fetch(`/api/article/${section}/${articleId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch article');
+                    }
+                    
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        article = data.data;
+                        
+                        // If article needs AI processing
+                        if (!article.titleKo && article.language !== 'ko') {
+                            // Request translation
+                            const transResponse = await fetch('/api/translate', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text: article.title })
+                            });
+                            
+                            if (transResponse.ok) {
+                                const transData = await transResponse.json();
+                                article.titleKo = transData.data.translated;
+                            }
+                        }
+                        
+                        // Generate summary if not exists
+                        if (!article.summaryPoints || article.summaryPoints.length === 0) {
+                            const summaryResponse = await fetch('/api/summarize', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    text: article.content || article.description,
+                                    maxPoints: 5,
+                                    detailed: true
+                                })
+                            });
+                            
+                            if (summaryResponse.ok) {
+                                const summaryData = await summaryResponse.json();
+                                article.fullSummaryPoints = summaryData.data.summary;
+                            }
+                        }
+                    } else {
+                        throw new Error('Invalid API response');
+                    }
+                } catch (error) {
+                    console.error('Failed to load article:', error);
+                    document.getElementById('loading').innerHTML = 
+                        `<p style="color: #dc2626;">오류: 기사를 불러올 수 없습니다.</p>
+                         <button onclick="window.history.back()" class="action-button close-button" style="max-width: 200px; margin: 1rem auto;">
+                            뒤로가기
+                         </button>`;
+                    return;
+                }
+            }
+
+            // Render article
+            renderArticle(article);
+        });
+
+        function renderArticle(article) {
+            // Hide loading, show content
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('article-content').classList.add('visible');
+            
+            // Set page title
+            const displayTitle = article.titleKo || article.title;
+            document.title = `${displayTitle} - EmarkNews`;
+            
+            // Render header
+            document.getElementById('article-title').textContent = displayTitle;
+            
+            const timeAgo = getTimeAgo(article.publishedAt);
+            document.getElementById('source-time').innerHTML = `
+                <span class="source">${article.source || 'Unknown'}</span>
+                <span>· ${timeAgo}</span>
+            `;
+            
+            document.getElementById('rating-badge').innerHTML = `
+                <span class="rating-star">⭐</span>${(article.rating || 3.0).toFixed(1)}
+            `;
+
+            // Render summary
+            const summaryPoints = article.fullSummaryPoints || article.summaryPoints || 
+                                 [article.descriptionKo || article.description || '요약 정보가 없습니다.'];
+            const summaryHtml = summaryPoints.map(point =>
+                `<div class="summary-point">
+                    <span class="summary-bullet">•</span>
+                    <span class="summary-text">${point}</span>
+                </div>`
+            ).join('');
+            document.getElementById('summary-content').innerHTML = summaryHtml;
+
+            // Render translation/content
+            const translationContent = article.content || article.descriptionKo || 
+                                     article.description || "번역된 내용이 없습니다.";
+            document.getElementById('translation-text').textContent = translationContent;
+
+            // Set source links
+            const sourceUrl = article.url || "#";
+            document.getElementById('link-summary').href = sourceUrl;
+            document.getElementById('link-translation').href = sourceUrl;
+            
+            // Disable link if no URL
+            if (sourceUrl === "#") {
+                document.getElementById('link-summary').style.display = 'none';
+                document.getElementById('link-translation').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
