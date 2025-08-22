@@ -35,6 +35,20 @@ function normalizeRssItem(item, source) {
   };
 }
 
+function filterRecentNews(items) {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  return items.filter(item => {
+    if (!item.publishedAt) return false;
+    
+    const publishedDate = new Date(item.publishedAt);
+    if (isNaN(publishedDate.getTime())) return false;
+    
+    return publishedDate >= thirtyDaysAgo;
+  });
+}
+
 async function fetchReutersWorld() {
   const urls = [
     'https://feeds.reuters.com/reuters/worldNews',
@@ -49,25 +63,6 @@ async function fetchReutersWorld() {
       }
     } catch (e) {
       logAxiosError(e, { source: 'Reuters', url });
-      continue;
-    }
-  }
-  return [];
-}
-
-async function fetchCnnWorld() {
-  const urls = [
-    'http://rss.cnn.com/rss/edition_world.rss',
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetchWithRetry(url, 3);
-      const feed = await parser.parseString(res.data);
-      if (feed?.items?.length) {
-        return feed.items.map((it) => normalizeRssItem(it, 'CNN'));
-      }
-    } catch (e) {
-      logAxiosError(e, { source: 'CNN', url });
       continue;
     }
   }
@@ -94,17 +89,20 @@ async function getWorldNewsFresh() {
   const newsService = new NewsService();
   const rssItems = await newsService.getNews('world');
   
-  // 기존 개별 소스도 시도 (추가 백업)
-  const [reuters, cnn] = await Promise.allSettled([fetchReutersWorld(), fetchCnnWorld()]);
+  // 기존 개별 소스도 시도 (추가 백업) - CNN 제거
+  const [reuters] = await Promise.allSettled([fetchReutersWorld()]);
   const additionalItems = [
     ...(reuters.status === 'fulfilled' ? reuters.value : []),
-    ...(cnn.status === 'fulfilled' ? cnn.value : []),
   ];
   
   // 모든 아이템 합치기 (rssItems가 배열인지 확인)
   const safeRssItems = Array.isArray(rssItems) ? rssItems : [];
   const allItems = [...safeRssItems, ...additionalItems];
-  return dedupeAndSort(allItems);
+  
+  // 날짜 필터링 적용
+  const recentItems = filterRecentNews(allItems);
+  
+  return dedupeAndSort(recentItems);
 }
 
 async function getWorldNewsSWR() {
