@@ -1,13 +1,14 @@
 /**
  * Emark 뉴스 서비스 (섹션 통합 + 가중치 프로필 포함 완성본)
  * - 섹션: buzz, world, korea, japan, business, tech
- * - 소스: X(Basic recent), Reddit, YouTube(mostPopular), RSS 화이트리스트
+ * - 소스: NewsAPI, GNews, Reddit, YouTube(mostPopular), RSS 화이트리스트
  * - 빠른 길: Phase1(600ms) → Phase2(1500ms) 백필(캐시: Redis)
  * - 랭킹: 섹션별 가중치 프로필(신선도/가속도/참여/신뢰/다양성/로케일)
  *
  * 환경변수(.env)
  *   REDIS_URL=redis://localhost:6379
- *   X_BEARER_TOKEN=...
+ *   NEWS_API_KEY=...
+ *   GNEWS_API_KEY=...
  *   REDDIT_TOKEN=...
  *   REDDIT_USER_AGENT=emark-buzz/1.0
  *   YOUTUBE_API_KEY=...
@@ -230,10 +231,24 @@ class NewsService {
     this.API_TIMEOUT = 5000;
     
     // API clients
-    this.xApi = axios.create({ 
-      baseURL:'https://api.twitter.com/2', 
+    this.newsApiClient = axios.create({ 
+      baseURL:'https://newsapi.org/v2/', 
       timeout:this.API_TIMEOUT, 
-      headers:{ Authorization:`Bearer ${process.env.X_BEARER_TOKEN||''}` }
+      headers:{ 'X-Api-Key': process.env.NEWS_API_KEY || '' }
+    });
+    
+    this.gnewsApi = axios.create({ 
+      baseURL:'https://gnews.io/api/v4/', 
+      timeout:this.API_TIMEOUT
+    });
+    
+    this.naverClient = axios.create({
+      baseURL: 'https://openapi.naver.com/v1/search/',
+      timeout: this.API_TIMEOUT,
+      headers: {
+        'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID || '',
+        'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET || ''
+      }
     });
     
     this.redditApi = axios.create({ 
@@ -294,12 +309,28 @@ class NewsService {
     const rs = RSS_FEEDS[section] || [];
     const yt = YT_REGIONS[section] || [];
 
-    // Phase1(600ms): 트위터 1~2개 + Reddit 1~2개 + RSS 2개
-    const phase1=[
-      ...(tw.slice(0,2).map(q=>this.fetchFromXRecent({query:q}))),
-      ...(rd.slice(0,2).map(r=>this.fetchFromRedditAPI(r))),
-      ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url)))
-    ];
+    // Phase1(600ms): 섹션별 우선순위 적용
+    let phase1 = [];
+    
+    if (section === 'kr') {
+      // 한국: 네이버 API 우선, RSS 보조
+      phase1 = [
+        this.fetchFromNaver(section),
+        ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url)))
+      ];
+    } else if (section === 'japan') {
+      // 일본: RSS 우선
+      phase1 = [
+        ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url)))
+      ];
+    } else {
+      // 기타 (세계/테크/비즈니스): NewsAPI + Reddit + RSS
+      phase1 = [
+        this.fetchFromNewsAPI(section),
+        ...(rd.slice(0,2).map(r=>this.fetchFromRedditAPI(r))),
+        ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url)))
+      ];
+    }
     
     const p1=await Promise.race([
       Promise.allSettled(phase1), 
@@ -332,11 +363,26 @@ class NewsService {
     // Phase2(1500ms): YouTube + 나머지 RSS + 나머지 트위터 쿼리
     (async()=>{
       try {
-        const phase2=[
-          ...yt.map(y=>this.fetchFromYouTubeTrending(y)),
-          ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)),
-          ...tw.slice(2).map(q=>this.fetchFromXRecent({query:q}))
-        ];
+        let phase2 = [];
+        
+        if (section === 'kr') {
+          // 한국: 나머지 RSS
+          phase2 = [
+            ...rs.slice(2).map(r=>this.fetchFromRSS(r.url))
+          ];
+        } else if (section === 'japan') {
+          // 일본: 나머지 RSS + 일본 신문사 웹크롤링 (TODO: 구현 필요)
+          phase2 = [
+            ...rs.slice(3).map(r=>this.fetchFromRSS(r.url))
+          ];
+        } else {
+          // 기타: YouTube + 나머지 RSS + GNews
+          phase2 = [
+            ...yt.map(y=>this.fetchFromYouTubeTrending(y)),
+            ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)),
+            this.fetchFromGNews(section)
+          ];
+        }
         
         const p2=await Promise.race([
           Promise.allSettled(phase2), 
@@ -432,30 +478,38 @@ class NewsService {
   // -----------------------------
   // Fetchers
   // -----------------------------
-  async fetchFromXRecent({query, max_results=50}){
-    if (!process.env.X_BEARER_TOKEN) return [];
-    
-    try{
-      const params={ query, max_results:Math.min(max_results,100),
-        'tweet.fields':'created_at,public_metrics,lang',
-        'expansions':'author_id','user.fields':'username,public_metrics'
+  async fetchFromNewsAPI(section) {
+    if (!process.env.NEWS_API_KEY) return [];
+
+    try {
+      const params = {
+        language: section === 'kr' ? 'ko' : 'en',
+        pageSize: 50,
+        sortBy: 'publishedAt'
       };
-      const {data}=await this.xApi.get('/tweets/search/recent',{params});
-      const users=(data?.includes?.users||[]).reduce((m,u)=>{m[u.id]=u;return m;},{});
-      return (data?.data||[]).map(t=>{
-        const m=t.public_metrics||{}; const a=users[t.author_id]||{};
-        return this.normalizeItem({
-          title:(t.text||'').replace(/\n+/g,' ').slice(0,220),
-          url:`https://x.com/i/web/status/${t.id}`,
-          source:'X', lang:t.lang||'und', publishedAt:t.created_at,
-          reactions:(m.like_count||0)+(m.retweet_count||0)+(m.reply_count||0)+(m.quote_count||0),
-          followers:a.public_metrics?.followers_count||0,
-          domain:'x.com', _srcType:'x'
-        });
-      });
-    }catch(e){ 
-      this.logger.warn('X recent fail:', e.message); 
-      return []; 
+
+      // Section-specific parameters
+      if (section === 'world') {
+        // Get news from multiple countries, not just US
+        const countries = ['gb', 'de', 'fr', 'jp', 'au', 'ca', 'in'];
+        const promises = countries.map(country => 
+          this.newsApiClient.get('top-headlines', {
+            params: { ...params, country }
+          }).catch(() => ({ data: { articles: [] }}))
+        );
+        const results = await Promise.all(promises);
+        return results.flatMap(r => this.normalizeNewsAPIArticles(r.data.articles || []));
+      } else if (section === 'tech') {
+        params.category = 'technology';
+      } else if (section === 'business') {
+        params.category = 'business';
+      }
+
+      const response = await this.newsApiClient.get('top-headlines', { params });
+      return this.normalizeNewsAPIArticles(response.data.articles || []);
+    } catch (error) {
+      this.logger.error('NewsAPI error:', error.message);
+      return [];
     }
   }
 
@@ -503,6 +557,55 @@ class NewsService {
     }
   }
 
+  async fetchFromGNews(section) {
+    if (!process.env.GNEWS_API_KEY) return [];
+
+    try {
+      const params = {
+        token: process.env.GNEWS_API_KEY,
+        max: 50,
+        lang: section === 'kr' ? 'ko' : 'en'
+      };
+
+      if (section === 'tech') {
+        params.topic = 'technology';
+      } else if (section === 'business') {
+        params.topic = 'business';
+      } else if (section === 'world') {
+        params.topic = 'world';
+      }
+
+      const response = await this.gnewsApi.get('top-headlines', { params });
+      return this.normalizeGNewsArticles(response.data.articles || []);
+    } catch (error) {
+      this.logger.error('GNews error:', error.message);
+      return [];
+    }
+  }
+
+  async fetchFromNaver(section) {
+    if (!process.env.NAVER_CLIENT_ID || !process.env.NAVER_CLIENT_SECRET) return [];
+
+    try {
+      const queries = ['속보', '긴급', '최신뉴스', '주요뉴스'];
+      const promises = queries.map(query =>
+        this.naverClient.get('news.json', {
+          params: {
+            query,
+            display: 30,
+            sort: 'date'
+          }
+        }).catch(() => ({ data: { items: [] }}))
+      );
+
+      const results = await Promise.all(promises);
+      return results.flatMap(r => this.normalizeNaverArticles(r.data.items || []));
+    } catch (error) {
+      this.logger.error('Naver API error:', error.message);
+      return [];
+    }
+  }
+
   async fetchFromRSS(url){
     try{
       const feed=await this.rssParser.parseURL(url);
@@ -520,6 +623,92 @@ class NewsService {
   // -----------------------------
   // 정규화 & 랭킹
   // -----------------------------
+  normalizeNewsAPIArticles(articles) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.publishedAt) return false;
+        
+        const publishedDate = new Date(article.publishedAt);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      })
+      .map(article => this.normalizeItem({
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        source: article.source?.name || 'NewsAPI',
+        publishedAt: article.publishedAt,
+        reactions: 0,
+        followers: 0,
+        domain: domainFromUrl(article.url),
+        _srcType: 'newsapi'
+      }));
+  }
+
+  normalizeGNewsArticles(articles) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.publishedAt) return false;
+        
+        const publishedDate = new Date(article.publishedAt);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      })
+      .map(article => this.normalizeItem({
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        source: article.source?.name || 'GNews',
+        publishedAt: article.publishedAt,
+        reactions: 0,
+        followers: 0,
+        domain: domainFromUrl(article.url),
+        _srcType: 'gnews'
+      }));
+  }
+
+  normalizeNaverArticles(articles) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.pubDate) return false;
+        
+        const publishedDate = new Date(article.pubDate);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      })
+      .map(article => this.normalizeItem({
+        title: this.stripHtml(article.title),
+        description: this.stripHtml(article.description),
+        url: article.originallink || article.link,
+        source: 'Naver News',
+        publishedAt: article.pubDate,
+        reactions: 0,
+        followers: 0,
+        domain: domainFromUrl(article.originallink || article.link),
+        _srcType: 'naver'
+      }));
+  }
+
+  stripHtml(text) {
+    if (!text) return '';
+    return text.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ').trim();
+  }
+
   normalizeItem(raw){
     const ageMin = minutesSince(raw.publishedAt);
     const domain = raw.domain || domainFromUrl(raw.url);
