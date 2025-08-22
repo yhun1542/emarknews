@@ -473,7 +473,7 @@
                 this.showLoading();
                 
                 try {
-                    const response = await fetch(`/api/news/${section}?limit=30`);
+                    const response = await fetch(`/api/${section}/fast`);
                     
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
