@@ -6,6 +6,7 @@ const CacheService = require('./cacheService');
 const RatingService = require('./ratingService');
 const { fetchWithRetry, logAxiosError } = require('./rss/httpClient');
 const { fetchReutersWorld } = require('./rss/reuters');
+const { fetchCnnWorld } = require('./rss/cnn');
 
 class NewsService {
   constructor() {
@@ -358,6 +359,12 @@ class NewsService {
       // Reuters 특별 처리 - 페일오버 시스템 사용
       if (source.name === 'Reuters World' || source.url.includes('reuters.com')) {
         const result = await fetchReutersWorld();
+        return result.articles || [];
+      }
+
+      // CNN 특별 처리 - 페일오버 시스템 사용
+      if (source.name === 'CNN World' || source.url.includes('cnn.com')) {
+        const result = await fetchCnnWorld();
         return result.articles || [];
       }
 
