@@ -463,8 +463,8 @@
                 const response = await fetch(`/api/news/${section}?limit=30`);
                 const data = await response.json();
 
-                if (data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
-                    displayNews(data.data);
+                if (data.success && data.data && data.data.articles && data.data.articles.length > 0) {
+                    displayNews(data.data.articles);
                 } else {
                     showError();
                 }
