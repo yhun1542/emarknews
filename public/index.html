@@ -506,6 +506,9 @@
                 const newsHtml = articles.map(article => this.createArticleCard(article)).join('');
                 newsGrid.innerHTML = newsHtml;
                 
+                // Add event listeners to detail buttons
+                this.addDetailButtonListeners();
+                
                 this.hideLoading();
                 newsGrid.style.display = this.isMobileView ? 'block' : 'grid';
             }
@@ -538,7 +541,7 @@
                 // Create action buttons
                 const actionsHtml = `
                     <div class="news-actions-wrapper">
-                        <button onclick="window.newsApp && window.newsApp.openDetailPage ? window.newsApp.openDetailPage('${article.id}') : alert('기능을 불러오는 중입니다.')" class="view-details-btn">
+                        <button class="view-details-btn" data-article-id="${article.id}" data-section="${this.currentSection}">
                             ✨ 상세보기
                         </button>
                     </div>
@@ -604,6 +607,23 @@
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
+            }
+
+            addDetailButtonListeners() {
+                const detailButtons = document.querySelectorAll('.view-details-btn');
+                detailButtons.forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const articleId = button.getAttribute('data-article-id');
+                        const section = button.getAttribute('data-section');
+                        
+                        if (articleId && section) {
+                            this.openDetailPage(articleId);
+                        } else {
+                            alert('기사 정보를 찾을 수 없습니다.');
+                        }
+                    });
+                });
             }
 
             openDetailPage(articleId) {
