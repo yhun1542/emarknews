@@ -1,5 +1,7 @@
 const { fetchWithRetry, logAxiosError } = require('./httpClient');
-const { parseRssXml } = require('./xmlParser');
+const Parser = require('rss-parser');
+
+const parser = new Parser();
 
 const CNN_WORLD = [
   'http://rss.cnn.com/rss/edition_world.rss',
@@ -13,7 +15,17 @@ async function fetchCnnWorld() {
       const res = await fetchWithRetry(url, 3);
       const xml = res?.data;
       if (!xml) continue;
-      return parseRssXml(xml, { source: 'CNN' });
+      
+      const feed = await parser.parseString(xml);
+      if (feed?.items?.length) {
+        return feed.items.map(item => ({
+          title: item.title,
+          link: item.link,
+          source: 'CNN',
+          description: item.contentSnippet || item.content || '',
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+        }));
+      }
     } catch (e) {
       lastErr = e;
       logAxiosError(e, { source: 'CNN', url });
@@ -21,7 +33,9 @@ async function fetchCnnWorld() {
       if (!['ENOTFOUND','EAI_AGAIN','ECONNRESET','ETIMEDOUT'].includes(e?.code)) break;
     }
   }
-  throw lastErr || new Error('CNN world feed unavailable');
+  
+  // 모든 URL 실패 시 빈 배열 반환
+  return [];
 }
 
 module.exports = { fetchCnnWorld };

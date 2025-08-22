@@ -1,7 +1,7 @@
 const { fetchWithRetry, logAxiosError } = require('./httpClient');
-// 사용 중인 파서/정규화 모듈 불러오기 가정
-const { parseRssXml } = require('./xmlParser'); // 프로젝트에 맞게 교체
-const { fetchFromNewsAPI } = require('./newsapi'); // 최후 페일백(이미 구현돼 있다면 사용)
+const Parser = require('rss-parser');
+
+const parser = new Parser();
 
 const FALLBACKS_WORLD = [
   // 1순위: 기존
@@ -17,7 +17,17 @@ async function fetchReutersWorld() {
       const res = await fetchWithRetry(url, 3);
       const xml = res?.data;
       if (!xml) continue;
-      return parseRssXml(xml, { source: 'Reuters' });
+      
+      const feed = await parser.parseString(xml);
+      if (feed?.items?.length) {
+        return feed.items.map(item => ({
+          title: item.title,
+          link: item.link,
+          source: 'Reuters',
+          description: item.contentSnippet || item.content || '',
+          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+        }));
+      }
     } catch (e) {
       lastErr = e;
       logAxiosError(e, { source: 'Reuters', url });
@@ -28,13 +38,9 @@ async function fetchReutersWorld() {
       }
     }
   }
-  // 최후: NewsAPI/GNews 등으로 백업 (키가 없으면 빈 배열 반환)
-  try {
-    return await fetchFromNewsAPI({ source: 'reuters', topic: 'world' });
-  } catch (e) {
-    logAxiosError(e, { source: 'Reuters', stage: 'final-fallback' });
-    throw lastErr || e;
-  }
+  
+  // 모든 URL 실패 시 빈 배열 반환
+  return [];
 }
 
 module.exports = { fetchReutersWorld };

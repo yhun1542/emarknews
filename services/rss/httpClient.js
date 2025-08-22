@@ -4,10 +4,10 @@ const https = require('https');
 const axios = require('axios');
 
 const agentHttp  = new http.Agent({ keepAlive: true, maxSockets: 50 });
-const agentHttps = new https.Agent({ keepAlive: true, maxSockets: 50 });
+const agentHttps = new https.Agent({ keepAlive: true, maxSockets: 50, rejectUnauthorized: false });
 
 const client = axios.create({
-  timeout: Number(process.env.RSS_TIMEOUT_MS ?? 10000),
+  timeout: Number(process.env.RSS_TIMEOUT_MS ?? 15000),
   maxRedirects: 5,
   httpAgent: agentHttp,
   httpsAgent: agentHttps,
@@ -27,8 +27,15 @@ async function fetchWithRetry(url, tries = 3) {
       return await client.get(url);
     } catch (e) {
       lastErr = e;
-      const backoff = Math.min(2000 * (2 ** i), 10000);
-      await sleep(backoff);
+      const code = e?.code;
+      // 재시도 가치 있는 오류인지 확인
+      if (['ENOTFOUND','EAI_AGAIN','ECONNRESET','ETIMEDOUT','ECONNREFUSED'].includes(code) || e?.response?.status >= 500) {
+        // 재시도 (백오프)
+        const backoff = Math.min(1000 * (2 ** i), 8000);
+        await sleep(backoff);
+        continue;
+      }
+      throw e;
     }
   }
   throw lastErr;
