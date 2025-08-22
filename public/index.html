@@ -538,7 +538,7 @@
                 // Create action buttons
                 const actionsHtml = `
                     <div class="news-actions-wrapper">
-                        <button onclick="newsApp.openDetailPage('${article.id}')" class="view-details-btn">
+                        <button onclick="window.newsApp && window.newsApp.openDetailPage ? window.newsApp.openDetailPage('${article.id}') : alert('기능을 불러오는 중입니다.')" class="view-details-btn">
                             ✨ 상세보기
                         </button>
                     </div>
