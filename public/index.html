@@ -648,8 +648,11 @@
             }
         }
 
-        // Initialize app
-        const newsApp = new EmarkNews();
+        // Initialize app when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const newsApp = new EmarkNews();
+            window.newsApp = newsApp; // Make it globally accessible
+        });
     </script>
 </body>
 </html>
