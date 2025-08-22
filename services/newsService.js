@@ -109,9 +109,33 @@ class NewsService {
   
   // ====== AI 연동 메서드 ======
   async _enrichArticlesWithAI(articles) {
-    // AI 기능 임시 비활성화 - 안정성을 위해
-    this.logger.info('AI enrichment temporarily disabled for stability');
-    return articles;
+    if (!this.aiService.client) {
+      this.logger.warn('AI Service is not initialized. Skipping enrichment.');
+      return articles;
+    }
+
+    const enrichmentPromises = articles.map(async (article) => {
+      try {
+        const [summaryResult, translationResult] = await Promise.all([
+          this.aiService.summarize(article.title + '\n' + (article.description || ''), { detailed: true }),
+          this.aiService.translate(article.title, 'ko')
+        ]);
+        
+        let summaryPoints = [];
+        if (summaryResult.success && summaryResult.data.summary) {
+            summaryPoints = summaryResult.data.summary.split('\n').map(line => line.replace(/^[•\-*]\s*/, '').trim()).filter(point => point);
+        }
+
+        const titleKo = (translationResult.success && translationResult.data.translated) ? translationResult.data.translated : article.title;
+
+        return { ...article, summaryPoints: summaryPoints.length > 0 ? summaryPoints : [article.description], titleKo };
+      } catch (error) {
+        this.logger.warn(`AI enrichment failed for article ${article.id}:`, error.message);
+        return article; 
+      }
+    });
+
+    return Promise.all(enrichmentPromises);
   }
 
   // ====== 내부: 빠른 길 ======
@@ -426,7 +450,7 @@ class NewsService {
   getCacheStatus() {
     return {
       type: redis ? 'redis' : 'memory',
-      connected: redis ? redis.isOpen : false
+      connected: redis ? (redis.isReady || redis.isOpen || false) : false, // ioredis는 isReady, node-redis v4+는 isOpen
     };
   }
 
