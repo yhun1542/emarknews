@@ -171,6 +171,7 @@ async function getWorldNewsSWR() {
 
   // 4) NewsAPI 페일백 시도 (키 없으면 throw)
   try {
+    const newsService = new NewsService();
     const fb = await newsService.fetchFromNewsAPI('world');
     if (fb.length) {
       if (r) {
@@ -198,7 +199,7 @@ async function worldHandler(req, res) {
       try {
         const newsService = new NewsService();
         const result = await newsService.getNews('world');
-        const articles = result?.data || [];
+        const articles = Array.isArray(result?.data) ? result.data : [];
         
         return res.status(200).json({
           success: true,
@@ -229,6 +230,7 @@ async function worldHandler(req, res) {
     console.error('[worldHandler-error]', e);
     // 최후 방어선: NewsAPI 시도 후 실패해도 200 반환
     try {
+      const newsService = new NewsService();
       const fb = await newsService.fetchFromNewsAPI('newsapi', 'world');
       return res.status(200).json({
         success: true,
