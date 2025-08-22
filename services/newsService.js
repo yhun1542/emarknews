@@ -149,9 +149,22 @@ class NewsService {
     const rd = REDDIT_EP[section] || [];
     const rs = RSS_FEEDS[section] || [];
     let phase1 = [];
-    if (section === 'kr') { phase1 = [ this.fetchFromNaver(section), ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url))) ]; }
-    else if (section === 'japan') { phase1 = [ ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url))) ]; }
-    else { phase1 = [ this.fetchFromNewsAPI(section), ...(rd.slice(0,2).map(r=>this.fetchFromRedditAPI(r))), ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url))) ]; }
+    
+    // API 키가 없을 때는 RSS 우선으로 처리
+    if (section === 'kr') { 
+      phase1 = [ this.fetchFromNaver(section), ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url))) ]; 
+    }
+    else if (section === 'japan') { 
+      phase1 = [ ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url))) ]; 
+    }
+    else { 
+      // API 키가 있을 때만 NewsAPI 사용, 없으면 RSS만 사용
+      if (process.env.NEWS_API_KEY && process.env.NEWS_API_KEY !== 'your_newsapi_key_here') {
+        phase1 = [ this.fetchFromNewsAPI(section), ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url))) ];
+      } else {
+        phase1 = [ ...(rs.slice(0,4).map(r=>this.fetchFromRSS(r.url))) ];
+      }
+    }
     
     const p1 = await Promise.race([ Promise.allSettled(phase1), new Promise(r=>setTimeout(()=>r([]), FAST.PHASE1_MS)) ]);
     const first = (Array.isArray(p1)?p1:[]).filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
@@ -167,9 +180,20 @@ class NewsService {
       try {
         const yt = YT_REGIONS[section] || [];
         let phase2 = [];
-        if (section === 'kr') { phase2 = [ ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)) ]; }
-        else if (section === 'japan') { phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; }
-        else { phase2 = [ ...yt.map(y=>this.fetchFromYouTubeTrending(y)), ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)), this.fetchFromGNews(section) ]; }
+        if (section === 'kr') { 
+          phase2 = [ ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)) ]; 
+        }
+        else if (section === 'japan') { 
+          phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; 
+        }
+        else { 
+          // API 키가 있을 때만 YouTube/GNews 사용
+          if (process.env.GNEWS_API_KEY && process.env.GNEWS_API_KEY !== 'your_gnews_api_key_here') {
+            phase2 = [ ...rs.slice(4).map(r=>this.fetchFromRSS(r.url)), this.fetchFromGNews(section) ];
+          } else {
+            phase2 = [ ...rs.slice(4).map(r=>this.fetchFromRSS(r.url)) ];
+          }
+        }
         
         const p2 = await Promise.race([ Promise.allSettled(phase2), new Promise(r=>setTimeout(()=>r([]), FAST.PHASE2_MS)) ]);
         const extra = (Array.isArray(p2)?p2:[]).filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
