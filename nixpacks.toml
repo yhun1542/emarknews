@@ -1,0 +1,26 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "coreutils"]
+
+[phases.install]
+cmds = [
+  "echo Node: $(node -v); echo NPM: $(npm -v)",
+  # 캐시/권한/잔여물 클린
+  "rm -rf node_modules || true",
+  "mkdir -p /tmp/.npm /tmp/.cache && chmod -R 777 /tmp/.npm /tmp/.cache",
+  # lock 동기화 보수 (CI서버에서만 필요시)
+  "test -f package-lock.json || npm install --package-lock-only --ignore-scripts",
+  # 문제의 핵심: npm ci를 '깨끗한 캐시'와 함께 실행
+  "npm ci --no-audit --no-fund --ignore-scripts || (npm cache clean --force && rm -rf node_modules && npm ci --no-audit --no-fund --ignore-scripts)"
+]
+
+[phases.build]
+cmds = [
+  "npm run build || true",
+  # ignore-scripts로 건너뛰어진 네이티브 모듈 재빌드 필요 시 여기에서만 실행
+  "npm run postinstall --if-present || true",
+  "npm run postbuild --if-present || true"
+]
+
+[start]
+cmd = "npm start"
+
