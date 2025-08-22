@@ -282,16 +282,23 @@ class NewsService {
         const yt = YT_REGIONS[section] || [];
         let phase2 = [];
         
-        // Phase2: 추가 RSS + 보조 API
+        // Phase2: 추가 RSS + YouTube API
         if (section === 'kr' || section === 'korea') { 
-          phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; // 추가 RSS
+          phase2 = [ 
+            ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)), // 추가 RSS
+            ...yt.map(y=>this.fetchFromYouTubeTrending(y)) // YouTube API
+          ];
         }
         else if (section === 'japan') { 
-          phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; // 추가 RSS
+          phase2 = [ 
+            ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)), // 추가 RSS
+            ...yt.map(y=>this.fetchFromYouTubeTrending(y)) // YouTube API
+          ];
         }
         else { 
           phase2 = [ 
-            ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)) // 추가 RSS
+            ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)), // 추가 RSS
+            ...yt.map(y=>this.fetchFromYouTubeTrending(y)) // YouTube API
           ];
         }
         
