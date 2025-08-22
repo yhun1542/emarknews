@@ -1,12 +1,15 @@
 // services/newsService.js - News Aggregation Service
 const axios = require('axios');
 const Parser = require('rss-parser');
+const https = require('https');
+const retryAxios = require('retry-axios');
 const logger = require('../utils/logger');
 const CacheService = require('./cacheService');
 const RatingService = require('./ratingService');
 const { fetchWithRetry, logAxiosError } = require('./rss/httpClient');
 const { fetchReutersWorld } = require('./rss/reuters');
 const { fetchCnnWorld } = require('./rss/cnn');
+const { rssSources } = require('../config/rssSources');
 
 class NewsService {
   constructor() {
@@ -16,6 +19,17 @@ class NewsService {
         'User-Agent': 'EmarkNews/2.0 (News Aggregator)'
       }
     });
+
+    // 개선된 axios 인스턴스: 재시도, User-Agent, TLS 옵션
+    this.axiosInstance = axios.create({
+      timeout: 15000,
+      headers: { 'User-Agent': 'EmarkNews/2.0 (https://emarknews.com)' },
+      httpsAgent: new https.Agent({ 
+        keepAlive: true, 
+        rejectUnauthorized: false  // TLS 문제 대비 (프로덕션 주의)
+      })
+    });
+    retryAxios.attach(this.axiosInstance, { retry: 3, retryDelay: 1000 });
 
     this.cache = new CacheService();
     this.ratingService = new RatingService();
@@ -189,6 +203,67 @@ class NewsService {
       logger.error(`Error fetching news for ${section}:`, error);
       throw error;
     }
+  }
+
+  // 개선된 단일 RSS 피드 fetch 메서드
+  async fetchSingleRSS(source) {
+    try {
+      const response = await this.axiosInstance.get(source.url);
+      const feed = await this.parser.parseString(response.data);
+      
+      if (!feed.items || feed.items.length === 0) {
+        return [];
+      }
+
+      // 데이터 정규화
+      return feed.items.map(item => ({
+        title: item.title,
+        description: item.contentSnippet || item.content || item.summary || '',
+        url: item.link,
+        urlToImage: item.enclosure?.url || null,
+        publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+        source: source.name,
+        content: item.content || item.contentSnippet || '',
+        language: 'en'
+      }));
+    } catch (err) {
+      logger.error(`RSS fetch failed (${source.name}): ${err.message}`);
+      return [];  // 실패 시 빈 배열 반환 (스킵)
+    }
+  }
+
+  // 개선된 Resilient RSS 피드 fetch 메서드
+  async fetchResilientRSS(section) {
+    const sources = rssSources[section] || [];
+    if (sources.length === 0) {
+      return [];
+    }
+
+    // 병렬 fetch (Promise.allSettled로 모든 소스 독립 처리)
+    const results = await Promise.allSettled(
+      sources.map(source => this.fetchSingleRSS(source))
+    );
+
+    const allNews = [];
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        allNews.push(...result.value);
+      }
+    });
+
+    if (allNews.length === 0) {
+      logger.warn(`All RSS sources failed for section: ${section}`);
+      return [];
+    }
+
+    // 중복 제거 (title 기반)
+    const uniqueNews = [...new Map(allNews.map(item => [item.title, item])).values()];
+    
+    // 정렬 (publishedAt descending)
+    uniqueNews.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+
+    logger.info(`Fetched ${uniqueNews.length} articles from ${sources.length} RSS sources for ${section}`);
+    return uniqueNews;
   }
 
   async fetchAllSources(section, config) {

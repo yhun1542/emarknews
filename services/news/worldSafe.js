@@ -90,12 +90,20 @@ function dedupeAndSort(items) {
 }
 
 async function getWorldNewsFresh() {
+  // 새로운 Resilient RSS 메서드 사용
+  const newsService = new NewsService();
+  const rssItems = await newsService.fetchResilientRSS('world');
+  
+  // 기존 개별 소스도 시도 (추가 백업)
   const [reuters, cnn] = await Promise.allSettled([fetchReutersWorld(), fetchCnnWorld()]);
-  const items = [
+  const additionalItems = [
     ...(reuters.status === 'fulfilled' ? reuters.value : []),
     ...(cnn.status === 'fulfilled' ? cnn.value : []),
   ];
-  return dedupeAndSort(items);
+  
+  // 모든 아이템 합치기
+  const allItems = [...rssItems, ...additionalItems];
+  return dedupeAndSort(allItems);
 }
 
 async function getWorldNewsSWR() {
