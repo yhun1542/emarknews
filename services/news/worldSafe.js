@@ -1,12 +1,11 @@
 // services/news/worldSafe.js
 const Parser = require('rss-parser');
 const { fetchWithRetry, logAxiosError } = require('../rss/httpClient');
-const NewsService = require('../newsService');
+const newsService = require('../newsService');
 
 const { createClient } = require('redis');
 
 const parser = new Parser();
-const newsService = new NewsService();
 const WORLD_PAGE_SIZE = Number(process.env.WORLD_PAGE_SIZE ?? 30);
 const SWR_TTL_SEC = Number(process.env.SWR_TTL_SEC ?? 1800);   // 신선 30m
 const STALE_TTL_SEC = Number(process.env.STALE_TTL_SEC ?? 7200); // 스테일 2h

@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 8080;
 app.set('trust proxy', true); // Railway 프록시 환경에서 X-Forwarded-For 헤더 신뢰
 
 // Initialize services
-const newsService = new NewsService();
+const newsService = require('./services/newsService');
 const aiService = new AIService();
 
 // 2) rate-limit: 표준 헤더만 사용하고, proxy 신뢰 기반 IP 추출
