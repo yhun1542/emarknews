@@ -3,7 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 # 락파일 동기화된 전제에서 설치
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+RUN npm ci --omit=dev
 
 FROM node:20-alpine AS runner
 WORKDIR /app
