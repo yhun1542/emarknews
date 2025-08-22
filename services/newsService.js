@@ -27,9 +27,9 @@ class NewsService {
           api: ['newsapi', 'gnews'],
           rss: [
             { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', name: 'BBC World' },
-            { url: 'https://rss.cnn.com/rss/edition_world.rss', name: 'CNN World' },
-            { url: 'https://feeds.reuters.com/Reuters/worldNews', name: 'Reuters World' },
-            { url: 'https://www.aljazeera.com/xml/rss/all.xml', name: 'Al Jazeera' }
+            { url: 'https://www.aljazeera.com/xml/rss/all.xml', name: 'Al Jazeera' },
+            { url: 'https://feeds.skynews.com/feeds/rss/world.xml', name: 'Sky News World' },
+            { url: 'https://feeds.theguardian.com/theguardian/world/rss', name: 'The Guardian World' }
           ]
         },
         ttl: 600
@@ -370,29 +370,55 @@ class NewsService {
 
   // Normalization methods
   normalizeNewsAPIArticles(articles) {
-    return articles.map(article => ({
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      url: article.url,
-      urlToImage: article.urlToImage,
-      source: article.source?.name || 'NewsAPI',
-      publishedAt: article.publishedAt,
-      language: this.detectLanguage(article.title)
-    }));
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .map(article => ({
+        title: article.title,
+        description: article.description,
+        content: article.content,
+        url: article.url,
+        urlToImage: article.urlToImage,
+        source: article.source?.name || 'NewsAPI',
+        publishedAt: article.publishedAt,
+        language: this.detectLanguage(article.title)
+      }))
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.publishedAt) return false;
+        
+        const publishedDate = new Date(article.publishedAt);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      });
   }
 
   normalizeGNewsArticles(articles) {
-    return articles.map(article => ({
-      title: article.title,
-      description: article.description,
-      content: article.content,
-      url: article.url,
-      urlToImage: article.image,
-      source: article.source?.name || 'GNews',
-      publishedAt: article.publishedAt,
-      language: this.detectLanguage(article.title)
-    }));
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .map(article => ({
+        title: article.title,
+        description: article.description,
+        content: article.content,
+        url: article.url,
+        urlToImage: article.image,
+        source: article.source?.name || 'GNews',
+        publishedAt: article.publishedAt,
+        language: this.detectLanguage(article.title)
+      }))
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.publishedAt) return false;
+        
+        const publishedDate = new Date(article.publishedAt);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      });
   }
 
   normalizeNaverArticles(articles) {
@@ -422,16 +448,29 @@ class NewsService {
   }
 
   normalizeRSSArticles(articles, sourceName) {
-    return articles.map(article => ({
-      title: article.title,
-      description: article.contentSnippet || article.content || '',
-      content: article.content || article.contentSnippet || '',
-      url: article.link,
-      urlToImage: article.enclosure?.url || null,
-      source: sourceName,
-      publishedAt: article.pubDate || article.isoDate,
-      language: this.detectLanguage(article.title)
-    }));
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return articles
+      .map(article => ({
+        title: article.title,
+        description: article.contentSnippet || article.content || '',
+        content: article.content || article.contentSnippet || '',
+        url: article.link,
+        urlToImage: article.enclosure?.url || null,
+        source: sourceName,
+        publishedAt: article.pubDate || article.isoDate,
+        language: this.detectLanguage(article.title)
+      }))
+      .filter(article => {
+        // 날짜 필터링: 최근 30일 이내의 뉴스만 포함
+        if (!article.publishedAt) return false;
+        
+        const publishedDate = new Date(article.publishedAt);
+        if (isNaN(publishedDate.getTime())) return false;
+        
+        return publishedDate >= thirtyDaysAgo;
+      });
   }
 
   async processArticles(articles, section) {
