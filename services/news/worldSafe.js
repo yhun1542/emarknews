@@ -1,7 +1,7 @@
 // services/news/worldSafe.js
 const Parser = require('rss-parser');
 const { fetchWithRetry, logAxiosError } = require('../rss/httpClient');
-const newsService = require('../newsService');
+const NewsService = require('../newsService');
 
 const { createClient } = require('redis');
 
@@ -97,9 +97,9 @@ function dedupeAndSort(items) {
 
 async function getWorldNewsFresh() {
   // NewsService 클래스 인스턴스 사용
-  const NewsService = require('../newsService');
   const newsService = new NewsService();
-  const rssItems = await newsService.getNews('world');
+  const result = await newsService.getNews('world');
+  const rssItems = result?.data || [];
   
   // 기존 개별 소스도 시도 (추가 백업) - CNN 제거
   const [reuters] = await Promise.allSettled([fetchReutersWorld()]);
@@ -175,19 +175,22 @@ async function worldHandler(req, res) {
   try {
     const { data } = await getWorldNewsSWR();
     
-    // 데이터가 없으면 NewsAPI로 즉시 페일백
+    // 데이터가 없으면 NewsService로 즉시 페일백
     if (!data || data.length === 0) {
       try {
-        const fb = await newsService.fetchFromNewsAPI('newsapi', 'world');
+        const newsService = new NewsService();
+        const result = await newsService.getNews('world');
+        const articles = result?.data || [];
+        
         return res.status(200).json({
           success: true,
           data: {
-            articles: fb.slice(0, WORLD_PAGE_SIZE)
+            articles: articles.slice(0, WORLD_PAGE_SIZE)
           }
         });
       } catch (e) {
         console.error('[newsapi-fallback-error]', e);
-        // NewsAPI도 실패하면 빈 배열 반환 (프론트 에러 UI 방지)
+        // NewsService도 실패하면 빈 배열 반환 (프론트 에러 UI 방지)
         return res.status(200).json({
           success: true,
           data: {
