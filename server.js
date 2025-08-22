@@ -97,7 +97,57 @@ app.get('/health', (req, res) => {
 
 // Main news endpoint
 
-// 4) 다운 방지용 fail-open 월드뉴스 라우트 (항상 콘텐츠 반환 시도)
+// New NewsService API Routes (빠른 로딩)
+app.get('/api/:section/fast', async (req, res) => {
+  try {
+    const { section } = req.params;
+    const validSections = ['world', 'kr', 'korea', 'japan', 'buzz', 'tech', 'business'];
+    
+    if (!validSections.includes(section)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid section. Must be one of: ${validSections.join(', ')}`
+      });
+    }
+
+    const result = await newsService.getSectionFast(section);
+    res.json(result);
+  } catch (error) {
+    logger.error(`API Error - /api/${req.params.section}/fast:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch news',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// New NewsService API Routes (완전체)
+app.get('/api/:section', async (req, res) => {
+  try {
+    const { section } = req.params;
+    const validSections = ['world', 'kr', 'korea', 'japan', 'buzz', 'tech', 'business'];
+    
+    if (!validSections.includes(section)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid section. Must be one of: ${validSections.join(', ')}`
+      });
+    }
+
+    const result = await newsService.getSectionFull(section);
+    res.json(result);
+  } catch (error) {
+    logger.error(`API Error - /api/${req.params.section}:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch news',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// 4) 다운 방지용 fail-open 월드뉴스 라우트 (기존 호환성)
 const { worldHandler } = require('./services/news/worldSafe');
 app.get('/api/news/world', worldHandler); // 기존 동일 경로가 있어도 이 라인이 먼저면 우선 적용됨
 
