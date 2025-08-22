@@ -1,8 +1,8 @@
 // services/newsService.js - News Aggregation Service
 const axios = require('axios');
+const axiosRetry = require('axios-retry').default || require('axios-retry');
 const Parser = require('rss-parser');
 const https = require('https');
-const retryAxios = require('retry-axios');
 const logger = require('../utils/logger');
 const CacheService = require('./cacheService');
 const RatingService = require('./ratingService');
@@ -20,7 +20,7 @@ class NewsService {
       }
     });
 
-    // 개선된 axios 인스턴스: 재시도, User-Agent, TLS 옵션
+    // 개선된 axios 인스턴스: axios-retry 사용
     this.axiosInstance = axios.create({
       timeout: 15000,
       headers: { 'User-Agent': 'EmarkNews/2.0 (https://emarknews.com)' },
@@ -29,7 +29,16 @@ class NewsService {
         rejectUnauthorized: false  // TLS 문제 대비 (프로덕션 주의)
       })
     });
-    retryAxios.attach(this.axiosInstance, { retry: 3, retryDelay: 1000 });
+
+    // axios-retry 설정
+    axiosRetry(this.axiosInstance, {
+      retries: 3,
+      retryDelay: axiosRetry.exponentialDelay,
+      retryCondition: (error) => {
+        // 네트워크 에러/5xx/429 등 재시도
+        return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response?.status === 429;
+      },
+    });
 
     this.cache = new CacheService();
     this.ratingService = new RatingService();
