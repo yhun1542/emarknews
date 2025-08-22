@@ -1,11 +1,12 @@
 // services/news/worldSafe.js
 const Parser = require('rss-parser');
 const { fetchWithRetry, logAxiosError } = require('../rss/httpClient');
-const { fetchFromNewsAPI } = require('./newsapi');
+const NewsService = require('../newsService');
 
 const { createClient } = require('redis');
 
 const parser = new Parser();
+const newsService = new NewsService();
 const WORLD_PAGE_SIZE = Number(process.env.WORLD_PAGE_SIZE ?? 30);
 const SWR_TTL_SEC = Number(process.env.SWR_TTL_SEC ?? 1800);   // 신선 30m
 const STALE_TTL_SEC = Number(process.env.STALE_TTL_SEC ?? 7200); // 스테일 2h
@@ -133,7 +134,7 @@ async function getWorldNewsSWR() {
 
   // 4) NewsAPI 페일백 시도 (키 없으면 throw)
   try {
-    const fb = await fetchFromNewsAPI({ pageSize: WORLD_PAGE_SIZE });
+    const fb = await newsService.fetchFromNewsAPI('world');
     if (fb.length) {
       if (r) {
         await r.set('news:world:v1', JSON.stringify(fb), { EX: STALE_TTL_SEC });
@@ -160,7 +161,7 @@ async function worldHandler(req, res) {
     console.error('[worldHandler-error]', e);
     // 최후: NewsAPI 한 번 더 시도 후, 실패해도 200 []
     try {
-      const fb = await fetchFromNewsAPI({ pageSize: WORLD_PAGE_SIZE });
+      const fb = await newsService.fetchFromNewsAPI('world');
       return res.json(fb);
     } catch {
       return res.json([]);

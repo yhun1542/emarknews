@@ -262,7 +262,22 @@ class NewsService {
 
       // Section-specific parameters
       if (section === 'world') {
-        // Get news from multiple countries, not just US
+        // 새로운 기능: 주요 소스 우선 사용
+        params.sources = 'bbc-news,reuters,associated-press,al-jazeera-english';
+        params.pageSize = 30; // sources 사용 시 pageSize 제한
+        delete params.sortBy; // sources와 sortBy는 함께 사용 불가
+        
+        const response = await this.newsAPIClient.get('top-headlines', { params });
+        return this.normalizeNewsAPIArticles(response.data.articles || []);
+      } else if (section === 'kr') {
+        // 한국 뉴스는 기존 방식 유지
+        params.country = 'kr';
+      } else if (section === 'tech') {
+        params.category = 'technology';
+      } else if (section === 'business') {
+        params.category = 'business';
+      } else {
+        // 기타 섹션은 다중 국가 방식 사용
         const countries = ['gb', 'de', 'fr', 'jp', 'au', 'ca', 'in'];
         const promises = countries.map(country => 
           this.newsAPIClient.get('top-headlines', {
@@ -271,10 +286,6 @@ class NewsService {
         );
         const results = await Promise.all(promises);
         return results.flatMap(r => this.normalizeNewsAPIArticles(r.data.articles || []));
-      } else if (section === 'tech') {
-        params.category = 'technology';
-      } else if (section === 'business') {
-        params.category = 'business';
       }
 
       const response = await this.newsAPIClient.get('top-headlines', { params });
