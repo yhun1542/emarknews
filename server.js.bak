@@ -24,7 +24,6 @@ const aiService = new AIService();
 
 // 2) rate-limit: 표준 헤더만 사용하고, proxy 신뢰 기반 IP 추출
 const limiter = rateLimit({
-  validate: { xForwardedForHeader: false },
   windowMs: Number(process.env.RATE_WINDOW_MS ?? 60_000),
   limit: Number(process.env.RATE_LIMIT ?? 120),
   standardHeaders: true,    // RFC 표준 헤더

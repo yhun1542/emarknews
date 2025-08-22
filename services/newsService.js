@@ -31,7 +31,7 @@ class NewsService {
           rss: [
             { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', name: 'BBC World' },
             { url: 'https://rss.cnn.com/rss/edition_world.rss', name: 'CNN World' },
-            { url: 'https://feeds.reuters.com/Reuters/worldNews', name: 'Reuters World' },
+            { url: 'https://ftr.fivefilters.org/makefulltextfeed.php?url=https%3A%2F%2Fwww.reuters.com%2Fworld&max=10', name: 'Reuters World' },
             { url: 'https://www.aljazeera.com/xml/rss/all.xml', name: 'Al Jazeera' }
           ]
         },
