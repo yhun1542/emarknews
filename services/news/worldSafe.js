@@ -89,9 +89,10 @@ function dedupeAndSort(items) {
 }
 
 async function getWorldNewsFresh() {
-  // 새로운 Resilient RSS 메서드 사용
-  const { getNews } = require('../newsService');
-  const rssItems = await getNews('world');
+  // NewsService 클래스 인스턴스 사용
+  const NewsService = require('../newsService');
+  const newsService = new NewsService();
+  const rssItems = await newsService.getNews('world');
   
   // 기존 개별 소스도 시도 (추가 백업)
   const [reuters, cnn] = await Promise.allSettled([fetchReutersWorld(), fetchCnnWorld()]);
