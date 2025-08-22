@@ -26,6 +26,16 @@ async function getRedis() {
 }
 
 function normalizeRssItem(item, source) {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const publishedDate = new Date(item.isoDate || item.pubDate || new Date().toISOString());
+  
+  // 30일 이내 뉴스만 반환
+  if (isNaN(publishedDate.getTime()) || publishedDate < thirtyDaysAgo) {
+    return null;
+  }
+  
   return {
     title: item.title,
     link: item.link,
@@ -59,7 +69,9 @@ async function fetchReutersWorld() {
       const res = await fetchWithRetry(url, 3);
       const feed = await parser.parseString(res.data);
       if (feed?.items?.length) {
-        return feed.items.map((it) => normalizeRssItem(it, 'Reuters'));
+        return feed.items
+          .map((it) => normalizeRssItem(it, 'Reuters'))
+          .filter(item => item !== null); // null 값 필터링
       }
     } catch (e) {
       logAxiosError(e, { source: 'Reuters', url });

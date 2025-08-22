@@ -20,13 +20,27 @@ async function fetchReutersWorld() {
       
       const feed = await parser.parseString(xml);
       if (feed?.items?.length) {
-        return feed.items.map(item => ({
-          title: item.title,
-          link: item.link,
-          source: 'Reuters',
-          description: item.contentSnippet || item.content || '',
-          publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
-        }));
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        return feed.items
+          .map(item => {
+            const publishedDate = new Date(item.isoDate || item.pubDate || new Date().toISOString());
+            
+            // 30일 이내 뉴스만 포함
+            if (isNaN(publishedDate.getTime()) || publishedDate < thirtyDaysAgo) {
+              return null;
+            }
+            
+            return {
+              title: item.title,
+              link: item.link,
+              source: 'Reuters',
+              description: item.contentSnippet || item.content || '',
+              publishedAt: item.isoDate || item.pubDate || new Date().toISOString(),
+            };
+          })
+          .filter(item => item !== null); // null 값 필터링
       }
     } catch (e) {
       lastErr = e;
