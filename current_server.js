@@ -300,9 +300,3 @@ app.get('/detail.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'detail.html'));
 });
 
-// SPA를 위한 catch-all 라우트: 위에서 일치하는 라우트가 없을 경우
-// 모든 GET 요청에 대해 index.html을 서빙합니다.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
