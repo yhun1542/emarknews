@@ -248,9 +248,17 @@ class NewsService {
     const rd = REDDIT_EP[section] || [];
     const rs = RSS_FEEDS[section] || [];
     let phase1 = [];
-    if (section === 'kr') { phase1 = [ this.fetchFromNaver(section), ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url))) ]; }
-    else if (section === 'japan') { phase1 = [ ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url))) ]; }
-    else { phase1 = [ this.fetchFromNewsAPI(section), ...(rd.slice(0,2).map(r=>this.fetchFromRedditAPI(r))), ...(rs.slice(0,2).map(r=>this.fetchFromRSS(r.url))) ]; }
+    
+    // RSS 우선 전략: 모든 섹션에서 RSS를 먼저 시도
+    if (section === 'kr' || section === 'korea') { 
+      phase1 = [ ...(rs.slice(0,4).map(r=>this.fetchFromRSS(r.url))) ]; // 한국: RSS 4개
+    }
+    else if (section === 'japan') { 
+      phase1 = [ ...(rs.slice(0,3).map(r=>this.fetchFromRSS(r.url))) ]; // 일본: RSS 3개
+    }
+    else { 
+      phase1 = [ ...(rs.slice(0,4).map(r=>this.fetchFromRSS(r.url))) ]; // 기타: RSS 4개 우선
+    }
     
     const p1 = await Promise.race([ Promise.allSettled(phase1), new Promise(r=>setTimeout(()=>r([]), FAST.PHASE1_MS)) ]);
     const first = (Array.isArray(p1)?p1:[]).filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
@@ -266,9 +274,23 @@ class NewsService {
       try {
         const yt = YT_REGIONS[section] || [];
         let phase2 = [];
-        if (section === 'kr') { phase2 = [ ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)) ]; }
-        else if (section === 'japan') { phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; }
-        else { phase2 = [ ...yt.map(y=>this.fetchFromYouTubeTrending(y)), ...rs.slice(2).map(r=>this.fetchFromRSS(r.url)), this.fetchFromGNews(section) ]; }
+        
+        // Phase2: API 보조 + 추가 RSS
+        if (section === 'kr' || section === 'korea') { 
+          phase2 = [ ...rs.slice(4).map(r=>this.fetchFromRSS(r.url)) ]; // 추가 RSS만
+        }
+        else if (section === 'japan') { 
+          phase2 = [ ...rs.slice(3).map(r=>this.fetchFromRSS(r.url)) ]; // 추가 RSS만
+        }
+        else { 
+          // 기타 섹션: RSS 우선 + API 보조
+          phase2 = [ 
+            ...rs.slice(4).map(r=>this.fetchFromRSS(r.url)), // 추가 RSS
+            // API는 키가 있을 때만 시도
+            ...(process.env.NEWS_API_KEY ? [this.fetchFromNewsAPI(section)] : []),
+            ...(process.env.GNEWS_API_KEY ? [this.fetchFromGNews(section)] : [])
+          ];
+        }
         
         const p2 = await Promise.race([ Promise.allSettled(phase2), new Promise(r=>setTimeout(()=>r([]), FAST.PHASE2_MS)) ]);
         const extra = (Array.isArray(p2)?p2:[]).filter(x=>x.status==='fulfilled').flatMap(x=>x.value||[]);
