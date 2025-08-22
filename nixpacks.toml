@@ -14,12 +14,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = [
-  "npm run build || true",
-  # ignore-scripts로 건너뛰어진 네이티브 모듈 재빌드 필요 시 여기에서만 실행
-  "npm run postinstall --if-present || true",
-  "npm run postbuild --if-present || true"
-]
+cmds = ["echo 'No additional build steps required'"]
 
 [start]
 cmd = "npm start"
