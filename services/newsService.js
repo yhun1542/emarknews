@@ -444,16 +444,22 @@ class NewsService {
 
   // ====== 기타 유틸리티 ======
   getStatus() {
-    return { initialized: true, sections: Object.keys(DEFAULT_WEIGHTS), cache: redis ? 'redis' : 'memory' };
-  }
-
-  getCacheStatus() {
     return {
-      type: redis ? 'redis' : 'memory',
-      connected: redis ? (redis.isReady || redis.isOpen || false) : false, // ioredis는 isReady, node-redis v4+는 isOpen
+      initialized: true,
+      sections: Object.keys(DEFAULT_WEIGHTS),
+      cache: redis ? 'redis' : 'memory'
     };
   }
 
+  // [복원된 필수 함수]
+  getCacheStatus() {
+    return {
+      type: redis ? 'redis' : 'memory',
+      connected: redis ? redis.isOpen : false, // ioredis는 isReady, node-redis v4+는 isOpen
+    };
+  }
+
+  // [복원된 필수 함수]
   async clearCache() {
     if (redis) {
       try {
