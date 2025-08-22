@@ -24,7 +24,6 @@ const aiService = new AIService();
 
 // 2) rate-limit: 표준 헤더만 사용하고, proxy 신뢰 기반 IP 추출
 const limiter = rateLimit({
-  validate: { xForwardedForHeader: false },
   windowMs: Number(process.env.RATE_WINDOW_MS ?? 60_000),
   limit: Number(process.env.RATE_LIMIT ?? 120),
   standardHeaders: true,    // RFC 표준 헤더
@@ -84,7 +83,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Main news API endpoint
+// Main news endpoint
+
+// 4) 다운 방지용 fail-open 월드뉴스 라우트 (항상 콘텐츠 반환 시도)
+const { worldHandler } = require('./services/news/worldSafe');
+app.get('/api/news/world', worldHandler); // 기존 동일 경로가 있어도 이 라인이 먼저면 우선 적용됨
+
+// API Routes
 app.get('/api/news/:section', async (req, res) => {
   try {
     const { section } = req.params;
