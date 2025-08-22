@@ -83,7 +83,41 @@ const SECTION_WEIGHTS = {
 const TW_QUERIES = { /* ... 기존 내용과 동일 ... */ };
 const REDDIT_EP = { /* ... 기존 내용과 동일 ... */ };
 const YT_REGIONS = { /* ... 기존 내용과 동일 ... */ };
-const RSS_FEEDS = { /* ... 기존 내용과 동일 ... */ };
+const RSS_FEEDS = {
+  world: [
+    { url: 'https://feeds.reuters.com/reuters/topNews', name: 'Reuters Top News' },
+    { url: 'http://rss.cnn.com/rss/edition.rss', name: 'CNN World' },
+    { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', name: 'BBC World' },
+    { url: 'https://rss.dw.com/rdf/rss-en-all', name: 'Deutsche Welle' },
+    { url: 'https://feeds.reuters.com/reuters/worldNews', name: 'Reuters World' }
+  ],
+  tech: [
+    { url: 'https://feeds.feedburner.com/TechCrunch', name: 'TechCrunch' },
+    { url: 'https://rss.cnn.com/rss/edition_technology.rss', name: 'CNN Tech' },
+    { url: 'https://feeds.reuters.com/reuters/technologyNews', name: 'Reuters Tech' },
+    { url: 'https://feeds.feedburner.com/venturebeat/SZYF', name: 'VentureBeat' },
+    { url: 'https://feeds.feedburner.com/oreilly/radar', name: 'O\'Reilly Radar' }
+  ],
+  business: [
+    { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters Business' },
+    { url: 'http://rss.cnn.com/rss/money_latest.rss', name: 'CNN Business' },
+    { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', name: 'BBC Business' },
+    { url: 'https://feeds.bloomberg.com/markets/news.rss', name: 'Bloomberg Markets' }
+  ],
+  buzz: [
+    { url: 'https://feeds.reuters.com/reuters/topNews', name: 'Reuters Top' },
+    { url: 'http://rss.cnn.com/rss/edition.rss', name: 'CNN Top' },
+    { url: 'https://feeds.bbci.co.uk/news/rss.xml', name: 'BBC News' }
+  ],
+  kr: [
+    { url: 'https://rss.joins.com/joins_news_list.xml', name: '중앙일보' },
+    { url: 'https://rss.hankyung.com/feed/economy.xml', name: '한국경제' }
+  ],
+  japan: [
+    { url: 'https://www3.nhk.or.jp/rss/news/cat0.xml', name: 'NHK News' },
+    { url: 'https://feeds.reuters.com/reuters/JPDomesticNews', name: 'Reuters Japan' }
+  ]
+};
 const SOURCE_WEIGHTS = { /* ... 기존 내용과 동일 ... */ };
 
 // -------------------------------
