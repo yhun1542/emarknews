@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const CacheService = require('./cacheService');
 const RatingService = require('./ratingService');
 const { fetchWithRetry, logAxiosError } = require('./rss/httpClient');
+const { fetchReutersWorld } = require('./rss/reuters');
 
 class NewsService {
   constructor() {
@@ -354,7 +355,13 @@ class NewsService {
 
   async fetchFromRSS(source) {
     try {
-      // 새로운 httpClient를 사용해서 RSS 피드 가져오기
+      // Reuters 특별 처리 - 페일오버 시스템 사용
+      if (source.name === 'Reuters World' || source.url.includes('reuters.com')) {
+        const result = await fetchReutersWorld();
+        return result.articles || [];
+      }
+
+      // 일반 RSS 피드 처리
       const response = await fetchWithRetry(source.url);
       const feed = await this.parser.parseString(response.data);
       return this.normalizeRSSArticles(feed.items || [], source.name);
