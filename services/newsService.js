@@ -113,7 +113,7 @@ async function getNews(section = 'world', limit = 30) {
         { url: 'https://rss.cnn.com/rss/edition_world.rss' },
         { url: 'https://feeds.reuters.com/reuters/topNews' }
       ],
-      korea: [
+      kr: [
         { url: 'https://rss.joins.com/joins_news_list.xml' },
         { url: 'http://rss.khan.co.kr/kh_news.xml' }
       ],

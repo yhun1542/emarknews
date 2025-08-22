@@ -100,8 +100,9 @@ async function getWorldNewsFresh() {
     ...(cnn.status === 'fulfilled' ? cnn.value : []),
   ];
   
-  // 모든 아이템 합치기
-  const allItems = [...rssItems, ...additionalItems];
+  // 모든 아이템 합치기 (rssItems가 배열인지 확인)
+  const safeRssItems = Array.isArray(rssItems) ? rssItems : [];
+  const allItems = [...safeRssItems, ...additionalItems];
   return dedupeAndSort(allItems);
 }
 
