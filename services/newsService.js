@@ -4,6 +4,7 @@ const Parser = require('rss-parser');
 const logger = require('../utils/logger');
 const CacheService = require('./cacheService');
 const RatingService = require('./ratingService');
+const { fetchWithRetry, logAxiosError } = require('./rss/httpClient');
 
 class NewsService {
   constructor() {
@@ -353,9 +354,13 @@ class NewsService {
 
   async fetchFromRSS(source) {
     try {
-      const feed = await this.parser.parseURL(source.url);
+      // 새로운 httpClient를 사용해서 RSS 피드 가져오기
+      const response = await fetchWithRetry(source.url);
+      const feed = await this.parser.parseString(response.data);
       return this.normalizeRSSArticles(feed.items || [], source.name);
     } catch (error) {
+      // 개선된 오류 로깅
+      logAxiosError(error, { source: source.name, url: source.url });
       logger.error(`RSS fetch failed (${source.name}):`, error.message);
       return [];
     }
