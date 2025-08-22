@@ -26,13 +26,13 @@ async function getRedis() {
 }
 
 function normalizeRssItem(item, source) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60); // 30일 -> 60일로 완화
   
   const publishedDate = new Date(item.isoDate || item.pubDate || new Date().toISOString());
   
-  // 30일 이내 뉴스만 반환
-  if (isNaN(publishedDate.getTime()) || publishedDate < thirtyDaysAgo) {
+  // 60일 이내 뉴스만 반환
+  if (isNaN(publishedDate.getTime()) || publishedDate < sixtyDaysAgo) {
     return null;
   }
   
@@ -46,8 +46,8 @@ function normalizeRssItem(item, source) {
 }
 
 function filterRecentNews(items) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60); // 30일 -> 60일로 완화
   
   return items.filter(item => {
     if (!item.publishedAt) return false;
@@ -55,7 +55,7 @@ function filterRecentNews(items) {
     const publishedDate = new Date(item.publishedAt);
     if (isNaN(publishedDate.getTime())) return false;
     
-    return publishedDate >= thirtyDaysAgo;
+    return publishedDate >= sixtyDaysAgo;
   });
 }
 
@@ -96,25 +96,43 @@ function dedupeAndSort(items) {
 }
 
 async function getWorldNewsFresh() {
+  console.log('[DEBUG] getWorldNewsFresh started');
+  
   // NewsService 클래스 인스턴스 사용
   const newsService = new NewsService();
+  console.log('[DEBUG] NewsService instance created');
+  
   const result = await newsService.getNews('world');
   const rssItems = result?.data || [];
+  console.log('[DEBUG] NewsService.getNews result:', { 
+    success: result?.success, 
+    itemCount: rssItems.length,
+    firstItem: rssItems[0]?.title 
+  });
   
   // 기존 개별 소스도 시도 (추가 백업) - CNN 제거
   const [reuters] = await Promise.allSettled([fetchReutersWorld()]);
   const additionalItems = [
     ...(reuters.status === 'fulfilled' ? reuters.value : []),
   ];
+  console.log('[DEBUG] Additional items:', { 
+    reutersStatus: reuters.status,
+    additionalCount: additionalItems.length 
+  });
   
   // 모든 아이템 합치기 (rssItems가 배열인지 확인)
   const safeRssItems = Array.isArray(rssItems) ? rssItems : [];
   const allItems = [...safeRssItems, ...additionalItems];
+  console.log('[DEBUG] All items combined:', allItems.length);
   
   // 날짜 필터링 적용
   const recentItems = filterRecentNews(allItems);
+  console.log('[DEBUG] After date filtering:', recentItems.length);
   
-  return dedupeAndSort(recentItems);
+  const finalResult = dedupeAndSort(recentItems);
+  console.log('[DEBUG] Final result:', finalResult.length);
+  
+  return finalResult;
 }
 
 async function getWorldNewsSWR() {
