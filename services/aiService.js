@@ -196,7 +196,8 @@ ${article}
       logger.info({
         reqId,
         elapsedMs: Date.now() - startedAt,
-        request_id: response?.id
+        request_id: response?.id,
+        textLength: finalText?.length || 0
       }, "summarize done");
 
       return finalText;
