@@ -80,9 +80,56 @@ const SECTION_WEIGHTS = {
 // -------------------------------
 // 섹션별 소스/키워드/화이트리스트
 // -------------------------------
-const TW_QUERIES = { /* ... 기존 내용과 동일 ... */ };
-const REDDIT_EP = { /* ... 기존 내용과 동일 ... */ };
-const YT_REGIONS = { /* ... 기존 내용과 동일 ... */ };
+const TW_QUERIES = {
+  buzz: [
+    '(breaking OR "breaking news" OR 속보 OR 緊急 OR 速報) (video OR live OR stream) -is:retweet lang:en OR lang:ko OR lang:ja',
+    '(viral OR meme OR 밈 OR ミーム OR 炎上 OR buzz) -is:retweet lang:en OR lang:ko OR lang:ja',
+    '(leak OR "leaked" OR 유출 OR 流出) (policy OR model OR product OR 영상) -is:retweet lang:en OR lang:ko OR lang:ja',
+    '(apology OR 사과 OR 炎上) (celebrity OR 인플루언서 OR タレント) -is:retweet lang:en OR lang:ko OR lang:ja'
+  ],
+  world: [
+    '(breaking OR "just in" OR "developing") -is:retweet lang:en',
+    '(earthquake OR hurricane OR typhoon OR 지진 OR 地震) -is:retweet lang:en OR lang:ja OR lang:ko'
+  ],
+  korea: [
+    '(속보 OR 긴급 OR 단독) -is:retweet lang:ko',
+    '(지진 OR 화재 OR 경찰 OR 검찰 OR 증시) -is:retweet lang:ko'
+  ],
+  kr: [
+    '(속보 OR 긴급 OR 단독) -is:retweet lang:ko',
+    '(지진 OR 화재 OR 경찰 OR 검찰 OR 증시) -is:retweet lang:ko'
+  ],
+  japan: [
+    '(速報 OR 緊急 OR 号外) -is:retweet lang:ja',
+    '(地震 OR 台風 OR 火災 OR 株価) -is:retweet lang:ja'
+  ],
+  business: [
+    '("earnings" OR "results" OR "guidance") -is:retweet lang:en',
+    '("merger" OR "acquisition" OR "M&A") -is:retweet lang:en'
+  ],
+  tech: [
+    '(AI OR LLM OR "model" OR "open-source") -is:retweet lang:en',
+    '(chip OR semiconductor OR GPU OR 파운드리) -is:retweet lang:en OR lang:ko OR lang:ja'
+  ]
+};
+const REDDIT_EP = {
+  buzz:    [{ path:'/r/all/new', limit:100 }, { path:'/r/all/hot', limit:100 }],
+  world:   [{ path:'/r/worldnews/new', limit:100 }],
+  korea:   [{ path:'/r/korea/new', limit:100 }],
+  kr:      [{ path:'/r/korea/new', limit:100 }],
+  japan:   [{ path:'/r/japannews/new', limit:100 }, { path:'/r/japan/new', limit:100 }],
+  business:[{ path:'/r/business/new', limit:100 }, { path:'/r/finance/new', limit:100 }],
+  tech:    [{ path:'/r/technology/new', limit:100 }, { path:'/r/programming/new', limit:100 }, { path:'/r/MachineLearning/new', limit:100 }]
+};
+const YT_REGIONS = {
+  buzz:    [{ regionCode:'KR', maxResults:30 }, { regionCode:'JP', maxResults:30 }, { regionCode:'US', maxResults:30 }],
+  world:   [{ regionCode:'US', maxResults:30 }, { regionCode:'GB', maxResults:30 }],
+  korea:   [{ regionCode:'KR', maxResults:30 }],
+  kr:      [{ regionCode:'KR', maxResults:30 }],
+  japan:   [{ regionCode:'JP', maxResults:30 }],
+  business:[{ regionCode:'US', maxResults:30 }],
+  tech:    [{ regionCode:'US', maxResults:30 }]
+};
 const RSS_FEEDS = {
   buzz: [
     { url:'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml', name:'BBC Entertainment', lang:'en' },
@@ -356,6 +403,27 @@ class NewsService {
   // ====== 기타 유틸리티 ======
   getStatus() {
     return { initialized: true, sections: Object.keys(DEFAULT_WEIGHTS), cache: redis ? 'redis' : 'memory' };
+  }
+
+  getCacheStatus() {
+    return {
+      type: redis ? 'redis' : 'memory',
+      connected: redis ? redis.isOpen : false
+    };
+  }
+
+  async clearCache() {
+    if (redis) {
+      try {
+        await redis.flushAll();
+        this.logger.info('Redis cache cleared.');
+      } catch (e) {
+        this.logger.warn('Redis clear failed:', e.message);
+      }
+    } else {
+      memoryCache.clear();
+      this.logger.info('Memory cache cleared.');
+    }
   }
 }
 
