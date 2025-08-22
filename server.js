@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 8080;
 
 // 1) 프록시 신뢰 (Railway/Nginx 등 1-hop 프록시 환경)
 //   - 반드시 rate-limit, logger 등 어떤 미들웨어보다 먼저 실행
-app.set('trust proxy', process.env.TRUST_PROXY ?? 1);
+app.set('trust proxy', true); // Railway 프록시 환경에서 X-Forwarded-For 헤더 신뢰
 
 // Initialize services
 const newsService = new NewsService();
@@ -29,10 +29,8 @@ const limiter = rateLimit({
   standardHeaders: true,    // RFC 표준 헤더
   legacyHeaders: false,     // 레거시 헤더 비활성
   keyGenerator: (req) => req.ip, // trust proxy 설정 시 client IP 정확히 인식
-  message: 'Too many requests, please try again later.',
-  validate: {
-    xForwardedForHeader: false  // X-Forwarded-For 헤더 검증 비활성화
-  }
+  message: 'Too many requests, please try again later.'
+  // validate 옵션 제거 - trust proxy true로 설정했으므로 기본 동작 사용
 });
 
 // Security middleware
