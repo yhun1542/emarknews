@@ -1,0 +1,8 @@
+error: unexpected argument '--lines' found
+
+  tip: to pass '--lines' as a value, use '-- --lines'
+
+Usage: railway logs [OPTIONS] [DEPLOYMENT_ID]
+
+For more information, try '--help'.
+

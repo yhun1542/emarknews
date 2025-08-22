@@ -29,7 +29,10 @@ const limiter = rateLimit({
   standardHeaders: true,    // RFC 표준 헤더
   legacyHeaders: false,     // 레거시 헤더 비활성
   keyGenerator: (req) => req.ip, // trust proxy 설정 시 client IP 정확히 인식
-  message: 'Too many requests, please try again later.'
+  message: 'Too many requests, please try again later.',
+  validate: {
+    xForwardedForHeader: false  // X-Forwarded-For 헤더 검증 비활성화
+  }
 });
 
 // Security middleware
