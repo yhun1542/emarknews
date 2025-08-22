@@ -1,4 +1,4 @@
-// services/newsService.js
+// services/newsService.js - Updated 2025-08-22 15:30 - Force rebuild
 const axios = require('axios');
 const axiosRetry = require('axios-retry').default || require('axios-retry');
 const Parser = require('rss-parser');
