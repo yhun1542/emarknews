@@ -344,13 +344,6 @@
             }
         }
 
-        /* Tablet styles */
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .news-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
         /* Hide scrollbar */
         .nav-container::-webkit-scrollbar,
         .news-grid::-webkit-scrollbar,
@@ -388,268 +381,217 @@
             color: #dc2626;
             margin-bottom: 1rem;
         }
-
-        .retry-button {
-            max-width: 200px;
-            margin: 1rem auto;
-        }
     </style>
 </head>
 <body>
     <header class="header">
         <div class="header-container">
             <a href="/" class="logo">
-                <img src="/logo.svg" alt="EmarkNews Logo" class="logo-svg" />
-                <span class="logo-text">EmarkNews</span><span class="logo-com">.com</span>
+                <img src="/logo.svg" alt="EmarkNews" class="logo-svg">
+                <span class="logo-text">EmarkNews</span>
+                <span class="logo-com">.com</span>
             </a>
         </div>
     </header>
 
     <nav class="nav">
         <div class="nav-container">
-            <button class="nav-item active" data-section="world">🌍 세계</button>
-            <button class="nav-item" data-section="kr">🇰🇷 한국</button>
-            <button class="nav-item" data-section="japan">🇯🇵 일본</button>
+            <button class="nav-item active" data-section="world">🌍 World</button>
+            <button class="nav-item" data-section="kr">🇰🇷 Korea</button>
+            <button class="nav-item" data-section="japan">🇯🇵 Japan</button>
             <button class="nav-item" data-section="buzz">🔥 Buzz</button>
-            <button class="nav-item" data-section="tech">💡 테크</button>
-            <button class="nav-item" data-section="business">💼 BIZ</button>
+            <button class="nav-item" data-section="tech">💻 Tech</button>
+            <button class="nav-item" data-section="business">💼 Business</button>
         </div>
     </nav>
 
     <main class="main">
         <div id="loading">
             <div class="spinner"></div>
-            <p>뉴스를 불러오는 중입니다...</p>
+            <p>뉴스를 불러오는 중...</p>
         </div>
-        <div id="news-grid" class="news-grid" style="display: none;"></div>
-        <div id="error" class="error-message" style="display: none;">
-            <h3>오류가 발생했습니다</h3>
-            <p id="error-text"></p>
-            <button onclick="location.reload()" class="view-details-btn retry-button">
-                새로고침
-            </button>
+        <div id="news-container" class="news-grid" style="display: none;"></div>
+        <div id="error-container" class="error-message" style="display: none;">
+            <h3>뉴스를 불러올 수 없습니다</h3>
+            <p>잠시 후 다시 시도해주세요.</p>
         </div>
     </main>
 
     <script>
-        class EmarkNews {
-            constructor() {
-                this.currentSection = 'world';
-                this.articles = [];
-                this.isMobileView = window.innerWidth <= 768;
-                this.isTabletView = window.innerWidth > 768 && window.innerWidth <= 1024;
-                this.init();
-            }
+        let currentSection = 'world';
+        let isLoading = false;
 
-            init() {
-                this.setupNavigation();
-                this.loadNews('world');
-                
-                window.addEventListener('resize', () => {
-                    const wasMobile = this.isMobileView;
-                    const wasTablet = this.isTabletView;
-                    this.isMobileView = window.innerWidth <= 768;
-                    this.isTabletView = window.innerWidth > 768 && window.innerWidth <= 1024;
-                    
-                    if (wasMobile !== this.isMobileView || wasTablet !== this.isTabletView) {
-                        this.displayNews(this.articles);
+        // DOM elements
+        const loadingEl = document.getElementById('loading');
+        const newsContainer = document.getElementById('news-container');
+        const errorContainer = document.getElementById('error-container');
+        const navItems = document.querySelectorAll('.nav-item');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            loadNews(currentSection);
+        });
+
+        // Navigation setup
+        function setupNavigation() {
+            navItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const section = item.dataset.section;
+                    if (section !== currentSection && !isLoading) {
+                        setActiveNav(item);
+                        currentSection = section;
+                        loadNews(section);
                     }
                 });
-            }
+            });
+        }
 
-            setupNavigation() {
-                document.querySelectorAll('.nav-item').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-                        e.target.classList.add('active');
-                        this.currentSection = e.target.dataset.section;
-                        this.loadNews(this.currentSection);
-                        this.scrollToTop();
-                    });
-                });
-            }
+        function setActiveNav(activeItem) {
+            navItems.forEach(item => item.classList.remove('active'));
+            activeItem.classList.add('active');
+        }
 
-            async loadNews(section) {
-                this.showLoading();
-                
-                try {
-                    const response = await fetch(`/api/news/${section}?limit=30`);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (data.success && data.data && data.data.articles) {
-                        this.articles = data.data.articles;
-                        this.displayNews(this.articles);
-                    } else {
-                        throw new Error('Invalid response format');
-                    }
-                } catch (error) {
-                    console.error('Failed to load news:', error);
-                    this.showError(error.message);
-                }
-            }
+        // Load news data
+        async function loadNews(section) {
+            if (isLoading) return;
+            
+            isLoading = true;
+            showLoading();
 
-            displayNews(articles) {
-                const newsGrid = document.getElementById('news-grid');
+            try {
+                const response = await fetch(`/api/news/${section}?limit=30`);
+                const data = await response.json();
                 
-                if (!articles || articles.length === 0) {
-                    newsGrid.innerHTML = '<div class="error-message"><p>뉴스가 없습니다.</p></div>';
-                    this.hideLoading();
-                    newsGrid.style.display = this.isMobileView ? 'block' : 'grid';
-                    return;
-                }
+                console.log('API Response:', data);
+                console.log('data.success:', data.success);
+                console.log('data.data:', data.data);
+                console.log('data.data.articles:', data.data ? data.data.articles : 'undefined');
 
-                const newsHtml = articles.map(article => this.createArticleCard(article)).join('');
-                newsGrid.innerHTML = newsHtml;
-                
-                this.hideLoading();
-                newsGrid.style.display = this.isMobileView ? 'block' : 'grid';
-            }
-
-            createArticleCard(article) {
-                const timeAgo = this.getTimeAgo(article.publishedAt);
-                const rating = parseFloat(article.rating) || 3.0;
-                const displayTitle = article.titleKo || article.title;
-                const summaryPoints = article.summaryPoints || [article.descriptionKo || article.description || '요약 정보가 없습니다.'];
-                
-                // Generate tags HTML (only allowed tags)
-                const tagsHtml = (article.tags || [])
-                    .map(tag => {
-                        const tagClass = this.getTagClass(tag);
-                        return `<span class="tag ${tagClass}">${tag}</span>`;
-                    })
-                    .join('');
-                
-                // Generate summary HTML
-                const maxPoints = this.isMobileView ? 15 : 3;
-                const summaryHtml = summaryPoints
-                    .slice(0, maxPoints)
-                    .map(point => `
-                        <div class="summary-point">
-                            <span class="summary-bullet">•</span>
-                            <span class="summary-text">${point}</span>
-                        </div>
-                    `).join('');
-                
-                // Create action buttons
-                const actionsHtml = `
-                    <div class="news-actions-wrapper">
-                        <button onclick="newsApp.openDetailPage('${article.id}')" class="view-details-btn">
-                            ✨ 상세보기
-                        </button>
-                    </div>
-                `;
-
-                return `
-                    <article class="news-item" data-id="${article.id}">
-                        <div class="news-content-wrapper">
-                            <div class="news-header">
-                                <div class="news-source-time">
-                                    <span class="news-source">${article.source || 'Unknown'}</span>
-                                    <span>·</span>
-                                    <span class="time-ago">${timeAgo}</span>
-                                </div>
-                                <div class="news-meta-group">
-                                    ${tagsHtml ? `<div class="news-tags">${tagsHtml}</div>` : ''}
-                                    <div class="rating-badge">
-                                        <span class="rating-star">⭐</span>${rating.toFixed(1)}
-                                    </div>
-                                </div>
-                            </div>
-                            <h2 class="news-title-translated">${this.escapeHtml(displayTitle)}</h2>
-                            <div class="ai-summary-main">
-                                ${summaryHtml}
-                            </div>
-                            ${this.isMobileView ? actionsHtml : ''}
-                        </div>
-                        ${!this.isMobileView ? actionsHtml : ''}
-                    </article>
-                `;
-            }
-
-            getTagClass(tag) {
-                const tagMap = {
-                    '긴급': 'urgent',
-                    '중요': 'important',
-                    'Hot': 'hot',
-                    'Buzz': 'buzz'
-                };
-                return tagMap[tag] || 'default';
-            }
-
-            getTimeAgo(publishedAt) {
-                const now = new Date();
-                const published = new Date(publishedAt);
-                
-                if (isNaN(published.getTime())) {
-                    return '';
-                }
-                
-                const diffMs = now - published;
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMins / 60);
-                const diffDays = Math.floor(diffHours / 24);
-                
-                if (diffMins < 1) return '방금 전';
-                if (diffMins < 60) return `${diffMins}분 전`;
-                if (diffHours < 24) return `${diffHours}시간 전`;
-                return `${diffDays}일 전`;
-            }
-
-            escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-
-            openDetailPage(articleId) {
-                const article = this.articles.find(a => a.id === articleId);
-                
-                if (!article) {
-                    alert('기사를 찾을 수 없습니다.');
-                    return;
-                }
-                
-                // Store article in sessionStorage
-                sessionStorage.setItem(`article_${this.currentSection}_${articleId}`, JSON.stringify(article));
-                
-                // Navigate to detail page
-                window.location.href = `/detail.html?section=${this.currentSection}&id=${articleId}`;
-            }
-
-            scrollToTop() {
-                const target = this.isMobileView ? document.getElementById('news-grid') : window;
-                if (target && target.scrollTo) {
-                    target.scrollTo({ top: 0, behavior: 'smooth' });
+                if (data.success && data.data && data.data.articles && data.data.articles.length > 0) {
+                    console.log('Displaying news with', data.data.articles.length, 'articles');
+                    displayNews(data.data.articles);
                 } else {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    console.log('Showing error - conditions not met');
+                    showError();
                 }
-            }
-
-            showLoading() {
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('news-grid').style.display = 'none';
-                document.getElementById('error').style.display = 'none';
-            }
-
-            hideLoading() {
-                document.getElementById('loading').style.display = 'none';
-            }
-
-            showError(message) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('news-grid').style.display = 'none';
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error-text').textContent = message;
+            } catch (error) {
+                console.error('Error loading news:', error);
+                showError();
+            } finally {
+                isLoading = false;
             }
         }
 
-        // Initialize app
-        const newsApp = new EmarkNews();
+        // Display functions
+        function showLoading() {
+            loadingEl.style.display = 'block';
+            newsContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+        }
+
+        function showError() {
+            loadingEl.style.display = 'none';
+            newsContainer.style.display = 'none';
+            errorContainer.style.display = 'block';
+        }
+
+        function displayNews(articles) {
+            loadingEl.style.display = 'none';
+            errorContainer.style.display = 'none';
+            newsContainer.style.display = 'grid';
+
+            newsContainer.innerHTML = articles.map(article => createNewsItem(article)).join('');
+        }
+
+        function createNewsItem(article) {
+            const tags = article.tags || [];
+            const rating = article.rating || 0;
+            const summary = article.summary || [];
+            
+            return `
+                <article class="news-item">
+                    <div class="news-content-wrapper">
+                        <div class="news-header">
+                            <div class="news-source-time">
+                                <span class="news-source">${escapeHtml(article.source || 'Unknown')}</span>
+                                <span>•</span>
+                                <span>${formatTime(article.publishedAt)}</span>
+                            </div>
+                            <div class="news-meta-group">
+                                ${tags.length > 0 ? `
+                                    <div class="news-tags">
+                                        ${tags.map(tag => `<span class="tag ${tag.toLowerCase()}">${tag}</span>`).join('')}
+                                    </div>
+                                ` : ''}
+                                ${rating > 0 ? `
+                                    <div class="rating-badge">
+                                        <span class="rating-star">★</span>
+                                        <span>${rating.toFixed(1)}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <h2 class="news-title-translated">${escapeHtml(article.titleTranslated || article.title || 'No title')}</h2>
+                        
+                        ${summary.length > 0 ? `
+                            <div class="news-summary">
+                                ${summary.slice(0, 3).map(point => `
+                                    <div class="summary-point">
+                                        <span class="summary-bullet">•</span>
+                                        <span>${escapeHtml(point)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="news-actions-wrapper">
+                        <button class="view-details-btn" onclick="viewDetails('${currentSection}', '${article.id}')">
+                            자세히 보기
+                        </button>
+                    </div>
+                </article>
+            `;
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime(dateString) {
+            if (!dateString) return '';
+            
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffMins < 1) return '방금 전';
+            if (diffMins < 60) return `${diffMins}분 전`;
+            if (diffHours < 24) return `${diffHours}시간 전`;
+            if (diffDays < 7) return `${diffDays}일 전`;
+            
+            return date.toLocaleDateString('ko-KR');
+        }
+
+        function viewDetails(section, articleId) {
+            window.location.href = `/detail.html?section=${section}&id=${articleId}`;
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(() => {
+            if (!isLoading) {
+                loadNews(currentSection);
+            }
+        }, 5 * 60 * 1000);
     </script>
 </body>
 </html>
+

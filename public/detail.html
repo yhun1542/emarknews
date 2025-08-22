@@ -259,6 +259,12 @@
             background: var(--primary-dark);
         }
 
+        .error-message {
+            text-align: center;
+            padding: 2rem;
+            color: #dc2626;
+        }
+
         @media (max-width: 768px) {
             .header-container {
                 padding: 0 1rem;
@@ -349,6 +355,14 @@
                 </div>
             </div>
         </div>
+
+        <div id="error" class="error-message" style="display: none;">
+            <h3>오류: 기사를 불러올 수 없습니다.</h3>
+            <p id="error-text"></p>
+            <button onclick="window.history.back()" class="action-button close-button" style="max-width: 200px; margin: 1rem auto;">
+                뒤로가기
+            </button>
+        </div>
     </main>
 
     <script>
@@ -368,8 +382,13 @@
             if (isNaN(published.getTime())) return "";
             
             const diffMinutes = Math.floor((now - published) / 60000);
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            
+            if (diffMinutes < 1) return "방금 전";
             if (diffMinutes < 60) return `${diffMinutes}분 전`;
-            return `${Math.floor(diffMinutes / 60)}시간 전`;
+            if (diffHours < 24) return `${diffHours}시간 전`;
+            return `${diffDays}일 전`;
         }
 
         // Page initialization
@@ -379,8 +398,7 @@
             const section = urlParams.get('section');
 
             if (!articleId || !section) {
-                document.getElementById('loading').innerHTML = 
-                    '<p style="color: #dc2626;">오류: 기사 정보를 찾을 수 없습니다.</p>';
+                showError('기사 정보를 찾을 수 없습니다.');
                 return;
             }
 
@@ -412,33 +430,41 @@
                         // If article needs AI processing
                         if (!article.titleKo && article.language !== 'ko') {
                             // Request translation
-                            const transResponse = await fetch('/api/translate', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ text: article.title })
-                            });
-                            
-                            if (transResponse.ok) {
-                                const transData = await transResponse.json();
-                                article.titleKo = transData.data.translated;
+                            try {
+                                const transResponse = await fetch('/api/translate', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ text: article.title })
+                                });
+                                
+                                if (transResponse.ok) {
+                                    const transData = await transResponse.json();
+                                    article.titleKo = transData.data.translated;
+                                }
+                            } catch (e) {
+                                console.error('Translation failed:', e);
                             }
                         }
                         
                         // Generate summary if not exists
                         if (!article.summaryPoints || article.summaryPoints.length === 0) {
-                            const summaryResponse = await fetch('/api/summarize', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    text: article.content || article.description,
-                                    maxPoints: 5,
-                                    detailed: true
-                                })
-                            });
-                            
-                            if (summaryResponse.ok) {
-                                const summaryData = await summaryResponse.json();
-                                article.fullSummaryPoints = summaryData.data.summary;
+                            try {
+                                const summaryResponse = await fetch('/api/summarize', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        text: article.content || article.description,
+                                        maxPoints: 5,
+                                        detailed: true
+                                    })
+                                });
+                                
+                                if (summaryResponse.ok) {
+                                    const summaryData = await summaryResponse.json();
+                                    article.fullSummaryPoints = summaryData.data.summary;
+                                }
+                            } catch (e) {
+                                console.error('Summary generation failed:', e);
                             }
                         }
                     } else {
@@ -446,11 +472,7 @@
                     }
                 } catch (error) {
                     console.error('Failed to load article:', error);
-                    document.getElementById('loading').innerHTML = 
-                        `<p style="color: #dc2626;">오류: 기사를 불러올 수 없습니다.</p>
-                         <button onclick="window.history.back()" class="action-button close-button" style="max-width: 200px; margin: 1rem auto;">
-                            뒤로가기
-                         </button>`;
+                    showError('기사를 불러올 수 없습니다.');
                     return;
                 }
             }
@@ -458,6 +480,13 @@
             // Render article
             renderArticle(article);
         });
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('article-content').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error-text').textContent = message;
+        }
 
         function renderArticle(article) {
             // Hide loading, show content
