@@ -1,6 +1,47 @@
+# railway.toml
+$schema = "https://railway.com/railway.schema.json"
+
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci"
+
+# Nixpacks의 기본 plan 대신 여기에 적은 plan을 "우선" 사용
+# (provider 플랜과 병합 시, 우리가 적은 값이 override 됨)
+# 참고: https://docs.railway.com/reference/config-as-code
+nixpacksPlan = { 
+  # 필요 시 provider 고정 (node만 사용)
+  providers = ["node"],
+
+  phases = {
+    setup = {
+      nixPkgs = ["nodejs_18", "coreutils"]
+    },
+
+    install = {
+      # 설치 단계에서 실행할 커맨드를 "완전히" 정의
+      # → 기본 npm ci 자동 삽입을 차단
+      cmds = [
+        # 안전 캐시 경로 생성 및 권한
+        "mkdir -p /tmp/.npm /tmp/.cache && chmod -R 777 /tmp/.npm /tmp/.cache",
+        # 혹시 남은 캐시 제거
+        "rm -rf node_modules/.cache || true",
+        # 스크립트 부작용 차단하고 순수 설치만 수행
+        "npm ci --no-audit --no-fund --ignore-scripts || (npm cache clean --force && rm -rf node_modules && npm ci --no-audit --no-fund --ignore-scripts)"
+      ],
+      # provider가 기본 주입하는 cache 디렉토리 완전 대체(빈 배열로 덮어쓰기)
+      cacheDirectories = [],
+      # 파일 최소 포함(레이어 충돌·속도 최적화)
+      onlyIncludeFiles = ["package.json", "package-lock.json"]
+    },
+
+    build = {
+      cmds = [
+        "npm run build --if-present || true",
+        "npm run postinstall --if-present || true",
+        "npm run postbuild --if-present || true"
+      ]
+    }
+  }
+}
 
 [deploy]
 startCommand = "npm start"
